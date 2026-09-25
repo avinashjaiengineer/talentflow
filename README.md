@@ -6,6 +6,8 @@ Five specialist AI agents source, screen, contact, schedule, and evaluate candid
 
 ![Pipeline board: candidates sourced and screened by Claude, ranked by fit](docs/screenshots/pipeline-board.jpg)
 
+**New here?** Read the **[user guide](docs/USER_GUIDE.md)** for how the platform works and how to use every screen.
+
 ## Screenshots
 
 | | |
