@@ -1,0 +1,15 @@
+Michael Anderson
+Backend Engineer, 6 years
+michael.anderson@example.com | Hyderabad, India
+
+EXPERIENCE
+FinServe Labs (2020 - present), Senior Backend Engineer
+- Built Python/FastAPI microservices for loan origination, 1.5k requests/sec.
+- Designed PostgreSQL schemas and read replicas; owned database migrations.
+- Moved deployments to Kubernetes with Docker; wrote CI/CD pipelines.
+
+DataCart (2018 - 2020), Backend Engineer
+- REST APIs in Python/Django; Redis caching.
+
+SKILLS
+Python, FastAPI, Django, PostgreSQL, Redis, Docker, Kubernetes, REST API design

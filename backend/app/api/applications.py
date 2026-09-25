@@ -7,7 +7,7 @@ from ..db import get_db
 from ..models import AgentTask, Application, Approval, ApprovalStatus, Stage, User
 from ..schemas import ApplicationOut, ApprovalOut, Decision, Notes, RejectRequest, SlotChoice, TaskOut
 from .deps import current_user
-from .serializers import application_out, approval_out
+from .serializers import application_out, approval_out, approval_rank
 
 router = APIRouter(tags=["pipeline"])
 
@@ -86,7 +86,11 @@ def list_approvals(status: ApprovalStatus | None = None, db: Session = Depends(g
     stmt = select(Approval).order_by(Approval.created_at.desc())
     if status:
         stmt = stmt.where(Approval.status == status)
-    return [approval_out(a) for a in db.scalars(stmt.limit(500)).all()]
+    items = [approval_out(a) for a in db.scalars(stmt.limit(500)).all()]
+    if status == ApprovalStatus.pending:
+        # The review queue leads with what's most worth a recruiter's time.
+        items.sort(key=approval_rank, reverse=True)
+    return items
 
 
 @router.post("/approvals/{approval_id}/decide", response_model=ApplicationOut)

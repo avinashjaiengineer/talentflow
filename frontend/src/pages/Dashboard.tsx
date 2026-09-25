@@ -52,7 +52,7 @@ export default function Dashboard() {
             <h2 className="font-semibold">Agent activity</h2>
             <Link to="/activity" className="text-sm text-indigo-600 hover:underline">View all</Link>
           </div>
-          <EventList events={events} compact />
+          <EventList events={events} />
         </Card>
       </div>
 

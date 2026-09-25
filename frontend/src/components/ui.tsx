@@ -75,10 +75,26 @@ export function StageBadge({ stage }: { stage: Stage }) {
   );
 }
 
-export function ScoreBadge({ score }: { score: number | null }) {
+export function ScoreBadge({ score, label }: { score: number | null; label?: string }) {
   if (score === null) return null;
   const tone = score >= 70 ? "bg-emerald-100 text-emerald-700" : score >= 50 ? "bg-amber-100 text-amber-800" : "bg-rose-100 text-rose-700";
-  return <Badge className={tone}>{score}</Badge>;
+  return <Badge className={tone}>{label ?? score}</Badge>;
+}
+
+const RECOMMENDATION: Record<string, { label: string; className: string }> = {
+  advance: { label: "Recommends advance", className: "text-emerald-700" },
+  hold: { label: "Recommends hold", className: "text-amber-700" },
+  reject: { label: "Recommends reject", className: "text-rose-700" },
+  strong_hire: { label: "Recommends strong hire", className: "text-emerald-700" },
+  hire: { label: "Recommends hire", className: "text-emerald-700" },
+  no_hire: { label: "Recommends no hire", className: "text-rose-700" },
+  strong_no_hire: { label: "Recommends strong no hire", className: "text-rose-700" },
+};
+
+export function Recommendation({ value }: { value: string | undefined }) {
+  const meta = value ? RECOMMENDATION[value] : undefined;
+  if (!meta) return null;
+  return <p className={cn("mt-1 text-xs font-medium", meta.className)}>{meta.label}</p>;
 }
 
 export function Modal({

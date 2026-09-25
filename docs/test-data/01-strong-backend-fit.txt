@@ -1,0 +1,16 @@
+Arjun Mehta
+Staff Backend Engineer, 9 years
+arjun.mehta@example.com | Bengaluru, India
+
+EXPERIENCE
+Razorpay (2019 - present), Staff Engineer, Payments Platform
+- Designed the Python/FastAPI settlement service processing 4M transactions/day.
+- Owned the PostgreSQL data model; cut p99 query latency from 900ms to 60ms with partitioning.
+- Led migration of 40 services from EC2 to Kubernetes (EKS) with Docker, Helm and Terraform.
+- Mentored 6 engineers; ran the REST API design review.
+
+Flipkart (2015 - 2019), Software Engineer
+- Built order-tracking APIs in Python and Go; introduced Kafka for event streaming.
+
+SKILLS
+Python, FastAPI, Go, PostgreSQL, Redis, Kafka, Docker, Kubernetes, Terraform, AWS, REST API design

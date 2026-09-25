@@ -3,7 +3,7 @@ import { CheckSquare } from "lucide-react";
 import { useState } from "react";
 import { api } from "../api";
 import ApplicationPanel from "../components/ApplicationPanel";
-import { Badge, Button, Card, Empty, Modal, PageHeader, cn, timeAgo } from "../components/ui";
+import { Badge, Button, Card, Empty, Modal, PageHeader, ScoreBadge, cn, timeAgo } from "../components/ui";
 
 const TABS = [
   { key: "pending", label: "Waiting" },
@@ -22,7 +22,10 @@ export default function ApprovalsPage() {
 
   return (
     <>
-      <PageHeader title="Approvals" subtitle="Agents recommend; people decide. Nothing advances or gets an offer without you." />
+      <PageHeader
+        title="Approvals"
+        subtitle={tab === "pending" ? "Offer decisions first, then strongest candidates. Agents recommend; you decide." : "Agents recommend; people decide."}
+      />
       <div className="mb-4 flex gap-1 rounded-lg bg-slate-100 p-1 text-sm sm:inline-flex">
         {TABS.map((t) => (
           <button
@@ -52,6 +55,7 @@ export default function ApprovalsPage() {
                   <Badge className={a.kind === "offer" ? "bg-emerald-100 text-emerald-700" : "bg-indigo-100 text-indigo-700"}>
                     {a.kind === "offer" ? "Offer decision" : "Advance after screening"}
                   </Badge>
+                  {a.score != null && a.score_max != null && <ScoreBadge score={Math.round((a.score / a.score_max) * 100)} label={`${a.score}/${a.score_max}`} />}
                 </div>
                 <p className="mt-1 line-clamp-2 text-sm text-slate-600">{a.recommendation}</p>
                 <p className="mt-1 text-xs text-slate-500">

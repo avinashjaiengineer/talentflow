@@ -61,9 +61,21 @@ def stats(db: Session = Depends(get_db)):
 def list_events(
     application_id: str | None = None, job_id: str | None = None, limit: int = 100, db: Session = Depends(get_db)
 ):
-    stmt = select(Event).order_by(Event.id.desc()).limit(max(1, min(limit, 500)))
+    stmt = (
+        select(Event, Candidate.name, Job.title)
+        .outerjoin(Application, Event.application_id == Application.id)
+        .outerjoin(Candidate, Application.candidate_id == Candidate.id)
+        .outerjoin(Job, Event.job_id == Job.id)
+        .order_by(Event.id.desc())
+        .limit(max(1, min(limit, 500)))
+    )
     if application_id:
         stmt = stmt.where(Event.application_id == application_id)
     if job_id:
         stmt = stmt.where(Event.job_id == job_id)
-    return db.scalars(stmt).all()
+    out = []
+    for event, candidate_name, job_title in db.execute(stmt).all():
+        item = EventOut.model_validate(event)
+        item.candidate_name, item.job_title = candidate_name, job_title
+        out.append(item)
+    return out

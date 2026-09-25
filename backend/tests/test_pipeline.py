@@ -132,3 +132,20 @@ def test_stats(client):
     _setup(client)
     s = client.get("/api/stats").json()
     assert s["open_jobs"] == 1 and s["candidates"] == len(RESUMES)
+
+
+def test_events_name_the_candidate_and_job(client, work):
+    job = _setup(client)
+    app = _source(client, work, job["id"], 1)[0]
+    events = client.get(f"/api/events?application_id={app['id']}").json()
+    assert events and all(e["candidate_name"] == app["candidate"]["name"] for e in events)
+    assert all(e["job_title"] == BACKEND_JOB["title"] for e in events)
+
+
+def test_review_queue_leads_with_strongest_candidates(client, work):
+    job = _setup(client)
+    _source(client, work, job["id"], 6)
+    queue = client.get("/api/approvals?status=pending").json()
+    scores = [a["score"] for a in queue]
+    assert len(queue) == 6 and all(a["score_max"] == 100 for a in queue)
+    assert scores == sorted(scores, reverse=True)

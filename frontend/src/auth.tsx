@@ -1,10 +1,18 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { type QueryClient, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Workflow } from "lucide-react";
 import { createContext, type FormEvent, type ReactNode, useContext, useEffect, useState } from "react";
 import { ApiError, UNAUTHORIZED_EVENT, api, type User } from "./api";
 import { Button, ErrorNote } from "./components/ui";
 
 const AuthContext = createContext<{ user: User; logout: () => void } | null>(null);
+
+// Drop the previous user's cached data but keep the ["me"] query itself: <AuthGate> is
+// subscribed to it, and removing it (e.g. qc.clear()) would leave the gate watching a
+// detached query that never sees the new value.
+function resetSession(qc: QueryClient, user: User | null) {
+  qc.removeQueries({ predicate: (q) => q.queryKey[0] !== "me" });
+  qc.setQueryData(["me"], user);
+}
 
 export function useAuth() {
   const ctx = useContext(AuthContext);
@@ -30,8 +38,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     await api.logout().catch(() => undefined);
-    qc.clear();
-    qc.setQueryData(["me"], null);
+    resetSession(qc, null);
   };
 
   if (isLoading) return <div className="flex min-h-screen items-center justify-center text-sm text-slate-500">Loading…</div>;
@@ -48,10 +55,7 @@ function LoginPage({ startupError }: { startupError: unknown }) {
   const [password, setPassword] = useState("");
   const login = useMutation({
     mutationFn: () => api.login(email, password),
-    onSuccess: ({ user }) => {
-      qc.clear();
-      qc.setQueryData(["me"], user);
-    },
+    onSuccess: ({ user }) => resetSession(qc, user),
   });
   const submit = (e: FormEvent) => {
     e.preventDefault();

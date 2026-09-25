@@ -4,6 +4,20 @@
 
 Five specialist AI agents source, screen, contact, schedule, and evaluate candidates. An orchestrator moves each candidate through the pipeline, and a person makes every decision that matters: nobody advances past screening or gets an offer without a human approving it.
 
+![Pipeline board: candidates sourced and screened by Claude, ranked by fit](docs/screenshots/pipeline-board.jpg)
+
+## Screenshots
+
+| | |
+|---|---|
+| ![Dashboard](docs/screenshots/dashboard.jpg) **Dashboard.** Pipeline at a glance and a live feed of agent activity. | ![Approvals](docs/screenshots/approvals.jpg) **Approvals.** The review queue, strongest candidates first. Agents recommend; you decide. |
+| ![Candidate approval](docs/screenshots/candidate-approval.jpg) **Candidate review.** The agent's recommendation, the approval gate, and the full timeline. | ![Screening evidence](docs/screenshots/screening-evidence.jpg) **Evidence-based screening.** Every requirement checked, with a quote from the resume. |
+| ![Talent pool](docs/screenshots/talent-pool.jpg) **Talent pool.** Upload PDF, DOCX, or TXT resumes; Claude parses the skills and experience. | ![Agent activity](docs/screenshots/agent-activity.jpg) **Audit trail.** Every agent action and human decision, with who made it. |
+
+_All screenshots show demo data from `python -m app.seed`, screened by Claude Opus 5._
+
+## Architecture
+
 ![Architecture](docs/architecture.png)
 
 ## Features

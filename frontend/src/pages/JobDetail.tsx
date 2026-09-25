@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, type Application, type Stage } from "../api";
 import ApplicationPanel from "../components/ApplicationPanel";
-import { Badge, Button, Card, Empty, ErrorNote, Modal, PageHeader, STAGE_META, ScoreBadge, StageBadge } from "../components/ui";
+import { Badge, Button, Card, Empty, ErrorNote, Modal, PageHeader, Recommendation, STAGE_META, ScoreBadge, StageBadge } from "../components/ui";
 
 const COLUMNS: { title: string; stages: Stage[] }[] = [
   { title: "Sourced & screening", stages: ["sourced", "screening"] },
@@ -161,6 +161,7 @@ function AppCard({ app, onClick }: { app: Application; onClick: () => void }) {
           <ScoreBadge score={app.screening_score} />
         </div>
         <p className="mt-0.5 line-clamp-2 text-xs text-slate-500">{app.candidate.headline}</p>
+        {!["offer", "rejected"].includes(app.stage) && <Recommendation value={app.scorecard?.recommendation ?? app.screening?.recommendation} />}
         <div className="mt-2 flex items-center justify-between">
           <StageBadge stage={app.stage} />
           {app.error && <span className="text-xs font-medium text-rose-600">Error</span>}

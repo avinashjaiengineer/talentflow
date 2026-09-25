@@ -77,6 +77,8 @@ class ApprovalOut(ORM):
     decided_at: UTCDateTime | None
     candidate_name: str | None = None
     job_title: str | None = None
+    score: int | None = None  # screening score (0-100) or scorecard rating (1-5)
+    score_max: int | None = None
 
 
 class ApplicationOut(ORM):
@@ -107,6 +109,8 @@ class EventOut(ORM):
     message: str
     data: dict | None
     created_at: UTCDateTime
+    candidate_name: str | None = None
+    job_title: str | None = None
 
 
 class SourceRequest(BaseModel):

@@ -1,0 +1,14 @@
+Neha Kapoor
+Junior Frontend Developer, 1 year
+neha.kapoor@example.com | Pune, India
+
+EXPERIENCE
+Freelance (2024 - present)
+- Built landing pages with HTML, CSS and React for small businesses.
+- Some exposure to Node.js for contact forms.
+
+EDUCATION
+B.Sc. Computer Science, 2024
+
+SKILLS
+JavaScript, React, HTML, CSS, Figma basics

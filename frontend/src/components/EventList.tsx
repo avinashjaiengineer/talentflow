@@ -25,10 +25,13 @@ export default function EventList({ events, compact }: { events: Event[]; compac
               <Icon className="size-3.5" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className={cn("text-sm text-slate-800", e.type === "agent_failed" && "text-rose-700")}>{e.message}</p>
+              <p className={cn("text-sm text-slate-800", e.type === "agent_failed" && "text-rose-700")}>
+                {!compact && e.candidate_name && <span className="font-medium">{e.candidate_name}: </span>}
+                {e.message}
+              </p>
               <p className="text-xs text-slate-500">
                 <span className="capitalize">{e.actor}</span>
-                {!compact && e.type && <> · {e.type.replaceAll("_", " ")}</>} · {timeAgo(e.created_at)}
+                {!compact && e.job_title && <> · {e.job_title}</>} · {timeAgo(e.created_at)}
               </p>
             </div>
           </li>

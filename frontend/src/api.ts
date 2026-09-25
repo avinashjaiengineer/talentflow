@@ -50,6 +50,8 @@ export interface Approval {
   decided_at: string | null;
   candidate_name: string | null;
   job_title: string | null;
+  score: number | null;
+  score_max: number | null;
 }
 
 export interface Screening {
@@ -102,6 +104,8 @@ export interface Event {
   message: string;
   data: Record<string, unknown> | null;
   created_at: string;
+  candidate_name: string | null;
+  job_title: string | null;
 }
 
 export interface Health {
