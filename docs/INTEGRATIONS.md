@@ -149,6 +149,25 @@ Resumes often include a phone number, which is extracted automatically. Otherwis
 
 ---
 
+## Verify your setup
+
+After setting the variables and redeploying, sign in as an admin and open **Settings → Integrations**:
+
+- **Run checks** tests everything that can be checked **without contacting anyone**:
+  - **Microsoft 365:** signing in to Entra ID, and reading the sender mailbox's free/busy (this confirms the calendar permission and the mailbox scope).
+  - **Twilio:** that the account is active (and warns if it's a trial), that the phone number belongs to the account and can make voice calls, and that `PUBLIC_BASE_URL` is reachable over HTTPS.
+- **Send test email to me** sends one email to your own address through Outlook. It's the only way to confirm `Mail.Send`.
+
+Each failed check explains the likely cause, for example an expired client secret, a mailbox outside the RBAC scope, or a number without voice capability.
+
+The same checks run from the server's command line:
+
+```bash
+docker compose -f deploy/docker-compose.prod.yml exec app python -m app.integrations.check
+```
+
+For the first real phone call, add yourself as a candidate with your own phone number and run a **Pre-screen call**.
+
 ## Costs
 
 | Item | Approximate cost |

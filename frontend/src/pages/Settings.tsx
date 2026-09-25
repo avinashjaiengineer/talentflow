@@ -13,6 +13,7 @@ export default function SettingsPage() {
       <div className="grid gap-6 lg:grid-cols-[1fr_1.4fr]">
         <ChangePassword />
         {user.role === "admin" && <Users me={user} />}
+        {user.role === "admin" && <Integrations />}
       </div>
     </>
   );
@@ -188,5 +189,43 @@ function ResetPassword({ user, onClose }: { user: User; onClose: () => void }) {
         </form>
       )}
     </Modal>
+  );
+}
+
+function Integrations() {
+  const checks = useMutation({ mutationFn: api.checkIntegrations });
+  const testEmail = useMutation({ mutationFn: api.sendTestEmail });
+  const areas = [...new Set((checks.data ?? []).map((c) => c.area))];
+  return (
+    <Card className="p-5 lg:col-span-2">
+      <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="font-semibold">Integrations</h2>
+        <div className="flex gap-2">
+          <Button variant="secondary" onClick={() => testEmail.mutate()} loading={testEmail.isPending}>Send test email to me</Button>
+          <Button onClick={() => checks.mutate()} loading={checks.isPending}>Run checks</Button>
+        </div>
+      </div>
+      <p className="mb-4 text-sm text-slate-500">
+        Checks your Microsoft 365 (Outlook, Teams) and Twilio setup without emailing, booking, or calling anyone. Setup steps are in docs/INTEGRATIONS.md.
+      </p>
+      {testEmail.isSuccess && <p className="mb-3 text-sm text-emerald-700">Test email sent to {testEmail.data.sent_to}. Check your inbox.</p>}
+      <ErrorNote error={testEmail.error ?? checks.error} />
+      {areas.map((area) => (
+        <div key={area} className="mb-4">
+          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">{area}</p>
+          <ul className="space-y-1.5">
+            {checks.data!.filter((c) => c.area === area).map((c) => (
+              <li key={c.name} className="flex gap-2 text-sm">
+                <span className={c.ok === true ? "text-emerald-600" : c.ok === false ? "text-rose-600" : "text-slate-400"}>
+                  {c.ok === true ? "✓" : c.ok === false ? "✗" : "–"}
+                </span>
+                <span className="w-36 shrink-0 font-medium text-slate-700">{c.name}</span>
+                <span className={c.ok === false ? "text-rose-700" : "text-slate-600"}>{c.detail}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </Card>
   );
 }

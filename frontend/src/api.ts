@@ -195,6 +195,13 @@ export interface Task {
   last_error: string | null;
 }
 
+export interface IntegrationCheck {
+  area: string;
+  name: string;
+  ok: boolean | null;
+  detail: string;
+}
+
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
     super(message);
@@ -240,6 +247,8 @@ export const api = {
   task: (id: number) => request<Task>(`/tasks/${id}`),
 
   system: () => request<Health>("/system"),
+  checkIntegrations: () => request<IntegrationCheck[]>("/system/integrations/check"),
+  sendTestEmail: () => request<{ sent_to: string }>("/system/integrations/test-email", json("POST")),
   stats: () => request<Stats>("/stats"),
   events: (params: { application_id?: string; job_id?: string; limit?: number } = {}) => {
     const q = new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)]));

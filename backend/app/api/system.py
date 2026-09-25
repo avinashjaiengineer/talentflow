@@ -6,9 +6,13 @@ from .. import __version__
 from ..config import get_settings
 from ..db import engine, get_db
 from ..embeddings import get_embedder
+from ..integrations import IntegrationError
+from ..integrations.check import run_checks
+from ..integrations.email import get_email_sender
 from ..llm import MockLLM, get_llm
-from ..models import AgentTask, Application, Approval, ApprovalStatus, Candidate, Event, Job, JobStatus, TaskStatus
+from ..models import AgentTask, Application, Approval, ApprovalStatus, Candidate, Event, Job, JobStatus, TaskStatus, User
 from ..schemas import EventOut, Health
+from .deps import require_admin
 
 public_router = APIRouter(tags=["system"])
 router = APIRouter(tags=["system"])
@@ -86,3 +90,24 @@ def list_events(
         item.candidate_name, item.job_title = candidate_name, job_title
         out.append(item)
     return out
+
+
+@router.get("/system/integrations/check")
+def check_integrations(_: User = Depends(require_admin)):
+    """Read-only connection checks for Microsoft 365 and Twilio (admins only)."""
+    return run_checks()
+
+
+@router.post("/system/integrations/test-email")
+def send_test_email(user: User = Depends(require_admin)):
+    """Send a test email to the signed-in admin through the configured provider."""
+    sender = get_email_sender()
+    if sender.name != "graph":
+        raise HTTPException(409, "Email isn't connected (EMAIL_PROVIDER=outbox), so there's nothing to test")
+    try:
+        sender.send(to=user.email, subject="TalentFlow test email",
+                    body=f"Hi {user.name},\n\nThis is a test from TalentFlow. Outlook email is working.\n\nTalentFlow")
+    except IntegrationError as e:
+        hint = " The app needs Mail.Send, scoped to the sender mailbox." if "403" in str(e) else ""
+        raise HTTPException(502, f"{e}{hint}") from e
+    return {"sent_to": user.email}
