@@ -1,0 +1,15 @@
+anthropic>=1.8,<2
+fastapi>=0.115
+uvicorn[standard]>=0.30
+sqlalchemy>=2.0
+pydantic[email]>=2.7
+pydantic-settings>=2.3
+psycopg[binary]>=3.2
+pgvector>=0.3
+python-multipart>=0.0.9
+pypdf>=4.0
+python-docx>=1.1
+fastembed>=0.4
+alembic>=1.13
+pyjwt>=2.8
+tzdata>=2024.1  # zoneinfo data on Windows

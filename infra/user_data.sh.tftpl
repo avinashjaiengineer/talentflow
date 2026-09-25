@@ -1,0 +1,42 @@
+#!/bin/bash
+# First-boot setup: Docker, swap, AWS CLI, nightly Postgres backups to S3, unattended security updates.
+set -euxo pipefail
+export DEBIAN_FRONTEND=noninteractive
+
+# 2 GB swap so image builds (npm, pip) fit on a 2 GB instance.
+if [ ! -f /swapfile ]; then
+  fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile
+  echo '/swapfile none swap sw 0 0' >> /etc/fstab
+fi
+
+apt-get update
+apt-get install -y ca-certificates curl unzip unattended-upgrades
+install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+chmod a+r /etc/apt/keyrings/docker.asc
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" > /etc/apt/sources.list.d/docker.list
+apt-get update
+apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+usermod -aG docker ubuntu
+systemctl enable --now docker
+
+curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
+unzip -q /tmp/awscliv2.zip -d /tmp && /tmp/aws/install --update
+
+mkdir -p /opt/talentflow && chown ubuntu:ubuntu /opt/talentflow
+
+cat > /usr/local/bin/talentflow-backup <<'SCRIPT'
+#!/bin/bash
+# Dump the database and upload it to S3. Runs nightly from cron; safe to run by hand.
+set -euo pipefail
+cd /opt/talentflow
+stamp=$(date -u +%Y-%m-%dT%H%M%SZ)
+docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env.production exec -T db \
+  pg_dump -U talentflow --format=custom talentflow \
+  | aws s3 cp - "s3://${backup_bucket}/postgres/talentflow-$stamp.dump" --region ${region}
+echo "backup uploaded: talentflow-$stamp.dump"
+SCRIPT
+chmod +x /usr/local/bin/talentflow-backup
+echo '30 2 * * * root /usr/local/bin/talentflow-backup >> /var/log/talentflow-backup.log 2>&1' > /etc/cron.d/talentflow-backup
+
+touch /var/lib/cloud/instance/talentflow-ready

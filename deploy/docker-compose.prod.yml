@@ -1,0 +1,77 @@
+# Production stack: Caddy (TLS) -> API (2 workers) + agent worker -> Postgres/pgvector.
+# Run from the repo root on the server:
+#   docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env.production up -d --build
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "5"
+
+x-app: &app
+  build: ..
+  image: talentflow:latest
+  restart: unless-stopped
+  env_file: .env.production
+  environment:
+    ENVIRONMENT: production
+    LOG_FORMAT: json
+    DATABASE_URL: postgresql+psycopg://talentflow:${POSTGRES_PASSWORD}@db:5432/talentflow
+    COOKIE_SECURE: ${COOKIE_SECURE:-false}
+  depends_on:
+    db:
+      condition: service_healthy
+  logging: *logging
+
+services:
+  db:
+    image: pgvector/pgvector:pg17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: talentflow
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/.env.production}
+      POSTGRES_DB: talentflow
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U talentflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    shm_size: 256mb
+    logging: *logging
+
+  app:
+    <<: *app
+    expose: ["8000"]
+
+  worker:
+    <<: *app
+    command: ["python", "-m", "app.worker"]
+    healthcheck:
+      disable: true
+    depends_on:
+      app:
+        condition: service_healthy
+    stop_grace_period: 2m  # let an in-flight agent call finish
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      SITE_ADDRESS: ${DOMAIN:-:80}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      app:
+        condition: service_healthy
+    logging: *logging
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

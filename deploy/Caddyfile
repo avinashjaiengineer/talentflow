@@ -1,0 +1,16 @@
+# SITE_ADDRESS is ":80" (plain HTTP on the server IP) or a domain name, in which case
+# Caddy obtains and renews a Let's Encrypt certificate automatically.
+{$SITE_ADDRESS} {
+	encode zstd gzip
+	request_body {
+		max_size 12MB
+	}
+	header {
+		-Server
+	}
+	@https expression {scheme} == "https"
+	header @https Strict-Transport-Security "max-age=31536000; includeSubDomains"
+	reverse_proxy app:8000 {
+		health_uri /api/health
+	}
+}

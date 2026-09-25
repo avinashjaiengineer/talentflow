@@ -1,0 +1,16 @@
+# Layered on top of docker-compose.prod.yml on EC2: container logs go to CloudWatch Logs.
+# The instance role created by infra/ grants logs:CreateLogStream/PutLogEvents on this group.
+x-cloudwatch: &cloudwatch
+  logging:
+    driver: awslogs
+    options:
+      awslogs-region: ${AWS_REGION:?}
+      awslogs-group: ${LOG_GROUP:-/talentflow/app}
+      awslogs-create-group: "false"
+      tag: "{{.Name}}"
+
+services:
+  db: *cloudwatch
+  app: *cloudwatch
+  worker: *cloudwatch
+  caddy: *cloudwatch
