@@ -17,10 +17,11 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import select, update
 from sqlalchemy.exc import OperationalError
 
-from . import orchestrator
+from . import comms, orchestrator
 from .config import get_settings
 from .db import SessionLocal
 from .events import log_event
+from .integrations import IntegrationError
 from .llm import LLMError
 from .logging_setup import configure_logging
 from .models import AgentTask, Application, Job, TaskKind, TaskStatus
@@ -79,6 +80,8 @@ def execute(task_id: int) -> None:
                 job = db.get(Job, task.job_id)
                 if job is not None:
                     task.result = orchestrator.run_sourcing(db, job, **(task.payload or {}))
+            else:
+                comms.run_task(db, task.kind, task.application_id, task.payload or {})
             task.status = TaskStatus.succeeded
             task.last_error = None
             db.commit()
@@ -88,7 +91,9 @@ def execute(task_id: int) -> None:
             db.rollback()
             error = e
 
-    retryable = (isinstance(error, LLMError) and error.retryable) or isinstance(error, OperationalError)
+    retryable = isinstance(error, OperationalError) or (
+        isinstance(error, LLMError | IntegrationError) and error.retryable
+    )
     with SessionLocal() as db:
         task = db.get(AgentTask, task_id)
         max_attempts = get_settings().task_max_attempts

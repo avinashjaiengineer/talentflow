@@ -77,6 +77,16 @@ def test_full_pipeline_with_approval_gates(client, work):
     app = client.get(f"/api/applications/{app_id}").json()
     assert app["stage"] == "contacted"
     assert app["outreach"]["subject"]
+    # The outreach email is a draft until a person sends it.
+    [draft] = [m for m in app["messages"] if m["kind"] == "outreach"]
+    assert draft["status"] == "draft" and draft["to"] == app["candidate"]["email"]
+    edited = client.patch(f"/api/messages/{draft['id']}", json={"subject": "Quick chat about a backend role?"}).json()
+    assert edited["subject"] == "Quick chat about a backend role?"
+    assert client.post(f"/api/messages/{draft['id']}/send").json()["status"] == "queued"
+    work()
+    sent = next(m for m in client.get(f"/api/applications/{app_id}").json()["messages"] if m["id"] == draft["id"])
+    assert sent["status"] == "sent" and sent["provider"] == "outbox" and sent["sent_by"] == "Admin"
+    assert client.patch(f"/api/messages/{draft['id']}", json={"subject": "x"}).status_code == 409  # sent emails are final
     decided = client.get("/api/approvals?status=approved").json()[0]
     assert decided["decided_by"] == "Admin"  # recorded from the session, not the request body
 
@@ -90,8 +100,13 @@ def test_full_pipeline_with_approval_gates(client, work):
     slots = app["scheduling"]["proposed_slots"]
     assert len(slots) == 3
     assert client.post(f"/api/applications/{app_id}/confirm-slot", json={"slot": "nope"}).status_code == 409
+    assert any(m["kind"] == "invitation" and m["status"] == "draft" for m in app["messages"])
     app = client.post(f"/api/applications/{app_id}/confirm-slot", json={"slot": slots[0]}).json()
     assert app["scheduling"]["confirmed_slot"] == slots[0]
+    work()  # books the meeting
+    app = client.get(f"/api/applications/{app_id}").json()
+    assert app["scheduling"]["meeting"]["provider"] == "local"
+    assert any(m["kind"] == "calendar_invite" for m in app["messages"])
 
     # Notes -> evaluation agent -> offer gate
     notes = "Strong system design, excellent communication, deep PostgreSQL knowledge."
@@ -107,7 +122,8 @@ def test_full_pipeline_with_approval_gates(client, work):
     assert client.get(f"/api/applications/{app_id}").json()["stage"] == "offer"
 
     types = {e["type"] for e in client.get(f"/api/events?application_id={app_id}").json()}
-    assert {"sourced", "screened", "outreach_sent", "slots_proposed", "scorecard_created", "approval_decided"} <= types
+    assert {"sourced", "screened", "outreach_drafted", "email_sent", "slots_proposed", "meeting_booked", "scorecard_created",
+            "approval_decided"} <= types
 
 
 def test_invalid_transitions_are_refused(client, work):

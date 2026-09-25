@@ -1,5 +1,5 @@
 from ..models import Application, Approval, ApprovalKind, ApprovalStatus
-from ..schemas import ApplicationOut, ApprovalOut, CandidateOut
+from ..schemas import ApplicationOut, ApprovalOut, CallOut, CandidateOut, MessageOut
 
 
 def approval_out(approval: Approval) -> ApprovalOut:
@@ -39,4 +39,6 @@ def application_out(app: Application) -> ApplicationOut:
         created_at=app.created_at,
         updated_at=app.updated_at,
         pending_approval=approval_out(pending) if pending else None,
+        messages=[MessageOut.model_validate(m) for m in app.messages],
+        calls=[CallOut.model_validate(c) for c in app.calls],
     )

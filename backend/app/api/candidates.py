@@ -7,7 +7,7 @@ from ..embeddings import embed_one
 from ..llm import LLMError
 from ..models import Candidate
 from ..resume import extract_text, parse_profile
-from ..schemas import ApplicationOut, CandidateDetail, CandidateIn, CandidateOut
+from ..schemas import ApplicationOut, CandidateDetail, CandidateIn, CandidateOut, CandidateUpdate
 from .serializers import application_out
 
 router = APIRouter(prefix="/candidates", tags=["candidates"])
@@ -79,6 +79,17 @@ def candidate_applications(candidate_id: str, db: Session = Depends(get_db)):
     if candidate is None:
         raise HTTPException(404, "Candidate not found")
     return [application_out(a) for a in candidate.applications]
+
+
+@router.patch("/{candidate_id}", response_model=CandidateDetail)
+def update_candidate(candidate_id: str, body: CandidateUpdate, db: Session = Depends(get_db)):
+    candidate = db.get(Candidate, candidate_id)
+    if candidate is None:
+        raise HTTPException(404, "Candidate not found")
+    for key, value in body.model_dump(exclude_unset=True).items():
+        setattr(candidate, key, value)
+    db.commit()
+    return candidate
 
 
 @router.delete("/{candidate_id}", status_code=204)

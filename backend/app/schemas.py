@@ -1,9 +1,21 @@
 from datetime import UTC, datetime
 from typing import Annotated
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field
+from pydantic import AfterValidator, BaseModel, ConfigDict, EmailStr, Field
 
-from .models import ApprovalKind, ApprovalStatus, JobStatus, Role, Stage, TaskKind, TaskStatus
+from .models import (
+    ApprovalKind,
+    ApprovalStatus,
+    CallPurpose,
+    CallStatus,
+    JobStatus,
+    MessageKind,
+    MessageStatus,
+    Role,
+    Stage,
+    TaskKind,
+    TaskStatus,
+)
 
 # SQLite drops tzinfo on read; every stored timestamp is UTC, so say so on the way out.
 UTCDateTime = Annotated[datetime, AfterValidator(lambda d: d if d.tzinfo else d.replace(tzinfo=UTC))]
@@ -19,6 +31,7 @@ class JobIn(BaseModel):
     location: str | None = None
     description: str = Field(min_length=1)
     requirements: list[str] = []
+    interviewer_emails: list[EmailStr] = []
 
 
 class JobUpdate(BaseModel):
@@ -27,6 +40,7 @@ class JobUpdate(BaseModel):
     location: str | None = None
     description: str | None = None
     requirements: list[str] | None = None
+    interviewer_emails: list[EmailStr] | None = None
     status: JobStatus | None = None
 
 
@@ -37,6 +51,7 @@ class JobOut(ORM):
     location: str | None
     description: str
     requirements: list[str]
+    interviewer_emails: list[str] = []
     status: JobStatus
     created_at: UTCDateTime
     stage_counts: dict[str, int] = {}
@@ -58,7 +73,16 @@ class CandidateOut(ORM):
     skills: list[str]
     years_experience: float | None
     resume_filename: str | None
+    do_not_call: bool = False
     created_at: UTCDateTime
+
+
+class CandidateUpdate(BaseModel):
+    name: str | None = Field(None, min_length=1, max_length=200)
+    email: EmailStr | None = None
+    phone: str | None = Field(None, max_length=50)
+    location: str | None = Field(None, max_length=120)
+    do_not_call: bool | None = None
 
 
 class CandidateDetail(CandidateOut):
@@ -98,6 +122,8 @@ class ApplicationOut(ORM):
     created_at: UTCDateTime
     updated_at: UTCDateTime
     pending_approval: ApprovalOut | None = None
+    messages: list["MessageOut"] = []
+    calls: list["CallOut"] = []
 
 
 class EventOut(ORM):
@@ -148,6 +174,7 @@ class Health(BaseModel):
     models: dict[str, str]
     embeddings: str
     database: str
+    integrations: dict[str, str] = {}
 
 
 class UserOut(ORM):
@@ -171,3 +198,52 @@ class TaskOut(ORM):
     last_error: str | None
     created_at: UTCDateTime
     updated_at: UTCDateTime
+
+
+class MessageOut(ORM):
+    id: str
+    kind: MessageKind
+    status: MessageStatus
+    to: str | None
+    subject: str
+    body: str
+    provider: str | None
+    error: str | None
+    sent_by: str | None
+    sent_at: UTCDateTime | None
+    created_at: UTCDateTime
+
+
+class MessageUpdate(BaseModel):
+    to: EmailStr | None = None
+    subject: str | None = Field(None, min_length=1, max_length=500)
+    body: str | None = Field(None, min_length=1, max_length=20_000)
+
+
+class CallOut(ORM):
+    id: str
+    purpose: CallPurpose
+    status: CallStatus
+    provider: str
+    to_number: str | None
+    context: dict
+    transcript: list[dict]
+    outcome: dict
+    summary: dict | None
+    error: str | None
+    requested_by: str | None
+    scheduled_for: UTCDateTime | None
+    started_at: UTCDateTime | None
+    ended_at: UTCDateTime | None
+    created_at: UTCDateTime
+
+
+class CallRequest(BaseModel):
+    purpose: CallPurpose
+
+
+class SimulatedReply(BaseModel):
+    text: str = Field(min_length=1, max_length=2000)
+
+
+ApplicationOut.model_rebuild()

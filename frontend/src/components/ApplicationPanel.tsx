@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Check, CheckCircle2, CircleDashed, Mail, RotateCw, Star, X, XCircle } from "lucide-react";
+import { AlertTriangle, CalendarCheck, Check, CheckCircle2, CircleDashed, RotateCw, Star, Video, X, XCircle } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { api, type Application } from "../api";
+import { CallsSection, EmailsSection } from "./Communication";
 import EventList from "./EventList";
 import { Badge, Button, Card, ErrorNote, STAGE_META, ScoreBadge, StageBadge, cn, formatSlot } from "./ui";
 
@@ -19,11 +20,20 @@ export function useApplicationActions(id: string) {
   };
 }
 
+function needsPolling(app: Application): boolean {
+  return (
+    STAGE_META[app.stage].working ||
+    app.messages.some((m) => m.status === "queued") ||
+    app.calls.some((c) => ["queued", "dialing", "in_progress"].includes(c.status) || (c.status === "completed" && !c.summary)) ||
+    (!!app.scheduling?.confirmed_slot && !app.scheduling.meeting)
+  );
+}
+
 export default function ApplicationPanel({ applicationId }: { applicationId: string }) {
   const { data: app, error } = useQuery({
     queryKey: ["application", applicationId],
     queryFn: () => api.application(applicationId),
-    refetchInterval: (q) => (q.state.data && STAGE_META[q.state.data.stage].working ? 1500 : false),
+    refetchInterval: (q) => (q.state.data && needsPolling(q.state.data) ? 1500 : false),
   });
   const { data: events = [] } = useQuery({
     queryKey: ["events", "application", applicationId, app?.updated_at],
@@ -64,7 +74,8 @@ export default function ApplicationPanel({ applicationId }: { applicationId: str
         <NextStep app={app} />
         {app.scorecard && <ScorecardView card={app.scorecard} />}
         {app.scheduling && <SchedulingView app={app} />}
-        {app.outreach && <EmailView title="Outreach email" to={app.outreach.to} subject={app.outreach.subject} body={app.outreach.body} />}
+        <CallsSection app={app} />
+        <EmailsSection app={app} />
         {app.screening && <ScreeningView app={app} />}
       </div>
 
@@ -129,7 +140,7 @@ function NextStep({ app }: { app: Application }) {
 
       {app.stage === "contacted" && (
         <div className="flex items-center justify-between gap-3">
-          <p className="text-sm text-slate-700">Waiting for the candidate to reply to outreach.</p>
+          <p className="text-sm text-slate-700">Send the outreach email (below) or run a pre-screen call. When the candidate replies, move on.</p>
           <Button onClick={() => a.replied.mutate()} loading={a.replied.isPending}>Candidate replied → schedule</Button>
         </div>
       )}
@@ -223,16 +234,6 @@ function List({ title, items }: { title: string; items: string[] }) {
   );
 }
 
-function EmailView({ title, to, subject, body }: { title: string; to?: string | null; subject: string; body: string }) {
-  return (
-    <Section title={title} right={<Mail className="size-4 text-slate-400" />}>
-      {to && <p className="text-xs text-slate-500">To: {to}</p>}
-      <p className="text-sm font-medium">{subject}</p>
-      <p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">{body}</p>
-    </Section>
-  );
-}
-
 function SchedulingView({ app }: { app: Application }) {
   const s = app.scheduling!;
   const { confirmSlot } = useApplicationActions(app.id);
@@ -258,13 +259,22 @@ function SchedulingView({ app }: { app: Application }) {
         })}
       </div>
       {!s.confirmed_slot && app.stage === "interview_scheduled" && (
-        <p className="mt-2 text-xs text-slate-500">Click the slot the candidate picked to book it.</p>
+        <p className="mt-2 text-xs text-slate-500">
+          Send the invitation email (below) or use "Call to schedule". When the candidate picks a slot, click it to book the meeting.
+        </p>
       )}
-      <details className="mt-3">
-        <summary className="cursor-pointer text-xs text-slate-500">Invitation email</summary>
-        <p className="mt-2 text-sm font-medium">{s.invitation.subject}</p>
-        <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{s.invitation.body}</p>
-      </details>
+      {s.confirmed_slot && !s.meeting && <p className="mt-2 text-xs text-sky-700">Booking the meeting…</p>}
+      {s.meeting && (
+        <p className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-600">
+          <CalendarCheck className="size-4 text-emerald-600" />
+          {s.meeting.provider === "graph" ? "Booked in Outlook; invitations sent." : "Booked in TalentFlow. Calendar isn't connected, so send the invite yourself."}
+          {s.meeting.join_url && (
+            <a href={s.meeting.join_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-medium text-indigo-600 hover:underline">
+              <Video className="size-3.5" /> Join Teams meeting
+            </a>
+          )}
+        </p>
+      )}
     </Section>
   );
 }

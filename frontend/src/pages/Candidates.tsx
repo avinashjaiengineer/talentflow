@@ -182,10 +182,10 @@ function CandidateBody({ c, apps, onDelete }: { c: Candidate; apps: Awaited<Retu
         <div>
           <h3 className="text-lg font-semibold">{c.name}</h3>
           <p className="text-sm text-slate-500">{c.headline}</p>
-          <p className="text-xs text-slate-500">{[c.email, c.phone, c.location].filter(Boolean).join(" · ")}</p>
         </div>
         <Button variant="danger" onClick={onDelete}><Trash2 className="size-4" /> Delete</Button>
       </div>
+      <ContactDetails c={c} />
       <div className="flex flex-wrap gap-1">{c.skills.map((s) => <Badge key={s}>{s}</Badge>)}</div>
       {apps.length > 0 && (
         <div>
@@ -205,5 +205,53 @@ function CandidateBody({ c, apps, onDelete }: { c: Candidate; apps: Awaited<Retu
         <pre className="max-h-96 overflow-y-auto whitespace-pre-wrap rounded-lg bg-slate-50 p-4 font-sans text-sm text-slate-700">{c.resume_text}</pre>
       </div>
     </div>
+  );
+}
+
+function ContactDetails({ c }: { c: Candidate }) {
+  const qc = useQueryClient();
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState({ email: c.email ?? "", phone: c.phone ?? "", location: c.location ?? "" });
+  const save = useMutation({
+    mutationFn: (body: Parameters<typeof api.updateCandidate>[1]) => api.updateCandidate(c.id, body),
+    onSuccess: () => {
+      setEditing(false);
+      qc.invalidateQueries();
+    },
+  });
+  if (!editing) {
+    return (
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+        <span>{c.email || <em className="text-slate-400">no email</em>}</span>
+        <span>{c.phone || <em className="text-slate-400">no phone</em>}</span>
+        {c.location && <span className="text-slate-500">{c.location}</span>}
+        {c.do_not_call && <Badge className="bg-rose-100 text-rose-700">Do not call</Badge>}
+        <button className="text-xs text-indigo-600 hover:underline" onClick={() => setEditing(true)}>Edit contact details</button>
+      </div>
+    );
+  }
+  return (
+    <form
+      className="grid gap-2 rounded-lg bg-slate-50 p-3 sm:grid-cols-3"
+      onSubmit={(e) => {
+        e.preventDefault();
+        save.mutate({ email: form.email || null, phone: form.phone || null, location: form.location || null });
+      }}
+    >
+      <input className="input" type="email" placeholder="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+      <input className="input" placeholder="Phone, e.g. +14155550100" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+      <input className="input" placeholder="Location" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} />
+      <label className="flex items-center gap-2 text-sm sm:col-span-2">
+        <input type="checkbox" checked={c.do_not_call} onChange={(e) => save.mutate({ do_not_call: e.target.checked })} />
+        Do not call this candidate
+      </label>
+      <div className="flex gap-2 sm:justify-end">
+        <Button type="button" variant="secondary" onClick={() => setEditing(false)}>Cancel</Button>
+        <Button type="submit" loading={save.isPending}>Save</Button>
+      </div>
+      <div className="sm:col-span-3">
+        <ErrorNote error={save.error} />
+      </div>
+    </form>
   );
 }

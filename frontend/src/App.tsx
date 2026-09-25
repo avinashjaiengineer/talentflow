@@ -132,6 +132,9 @@ function SystemInfo({ health }: { health?: Health }) {
       {models.length > 0 && <div>Model: {models.join(", ")}</div>}
       <div>Version {health.version}</div>
       <div>Embeddings: {health.embeddings}</div>
+      <div>Email: {health.integrations.email === "graph" ? "Outlook" : "not connected"}</div>
+      <div>Calendar: {health.integrations.calendar === "graph" ? "Outlook + Teams" : "not connected"}</div>
+      <div>Calls: {health.integrations.voice === "twilio" ? "Twilio" : "simulated"}</div>
       <div>Database: {health.database}</div>
     </div>
   );

@@ -177,22 +177,36 @@ For each candidate:
 
 The agent's recommendation is advice. You can advance someone it suggested rejecting, and the other way round.
 
-### Step 3: Outreach
+### Step 3: Outreach (email and/or a pre-screen call)
 
-After you advance someone, the outreach agent writes an email within about 10 seconds. The stage becomes **Contacted**.
+After you advance someone, the outreach agent writes an email within about 10 seconds. The stage becomes **Contacted**. Open the candidate:
 
-> **Important:** TalentFlow does not send email yet. Open the candidate, read the **Outreach email**, edit it if needed, and send it from your own email account.
+- **Emails → Outreach email:** click **Edit** to adjust it, then **Send**.
+  - With Outlook connected, it goes out from the recruiting mailbox.
+  - Without it, "Send" records the email as sent in TalentFlow, and you send it from your own mail.
+- **AI calls → Pre-screen call** (optional): the calling agent phones the candidate. It says it's an AI and asks if it's a good time. Then it asks about their interest, one or two job requirements, notice period, and salary expectations. Afterwards you'll see a **summary**, the answers, and the full **transcript**.
+  - Without Twilio connected, the call is **simulated**: a chat box opens and you type the candidate's replies. It's a good way to see how the agent behaves.
 
 ### Step 4: Log the reply
 
-When the candidate replies that they're interested, open them and click **Candidate replied → schedule**. If they aren't interested, click **Reject candidate** and add the reason.
+When the candidate replies (or says on the pre-screen call) that they're interested, click **Candidate replied → schedule**. If they aren't interested, click **Reject candidate** and add the reason.
 
 ### Step 5: Schedule the interview
 
-The scheduling agent proposes **3 slots** on the next business days during working hours, in the server's configured timezone. It also writes an invitation, which you'll find under **Invitation email**.
+The scheduling agent proposes **3 slots** in working hours in the server's timezone.
+- With Outlook connected, and **interviewers** listed on the job, the slots avoid the interviewers' busy times.
+- The agent also drafts an **Interview invitation** email.
 
-1. Send the invitation yourself; it isn't sent automatically.
-2. When the candidate picks a slot, **click that slot** to book it. It turns green.
+Agree a time in one of three ways:
+1. **Send** the invitation email. When the candidate picks a slot, **click that slot**.
+2. **Call to schedule:** the calling agent offers the slots on the phone and books the one the candidate picks.
+3. Agree it yourself, then click the slot.
+
+When a slot is booked, TalentFlow creates the interview:
+- **With Outlook connected:** it's booked in the recruiting calendar with a **Teams meeting**, Outlook emails the invitation to the candidate and interviewers, and a **Join Teams meeting** link appears on the candidate.
+- **Without it:** the booking is recorded, and you send the calendar invite yourself.
+
+Optionally, click **Schedule reminder call**. The agent calls the candidate 24 hours before the interview to confirm they'll attend, and shows "Confirmed" or "Asked to reschedule".
 
 ### Step 6: Interview and notes
 
@@ -323,9 +337,9 @@ Hiring decisions affect people's lives. TalentFlow is built so that **AI assists
 
 ## 14. Current limitations
 
-- **Emails are not sent** automatically. Outreach and invitations are drafted for you to send.
-- **Replies are logged by hand** ("Candidate replied").
-- **Interview slots aren't checked against real calendars.**
+- **Email, calendar, and phone calls need setup.** Until an admin connects Microsoft 365 and Twilio ([INTEGRATIONS.md](INTEGRATIONS.md)), emails are recorded rather than sent, bookings aren't in a real calendar, and calls are simulated.
+- **Email replies are logged by hand** ("Candidate replied"). TalentFlow doesn't read the inbox yet.
+- **Only Microsoft 365** is supported for email and calendar. Google Workspace isn't supported yet.
 - **No bulk actions** (approve or reject many at once).
 - **No candidate deduplication.**
 - **Jobs can't be edited in the app** after creation, and changed requirements don't re-screen existing candidates.

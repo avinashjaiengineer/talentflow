@@ -19,6 +19,7 @@ export interface Job {
   location: string | null;
   description: string;
   requirements: string[];
+  interviewer_emails: string[];
   status: "open" | "closed";
   created_at: string;
   stage_counts: Record<string, number>;
@@ -34,6 +35,7 @@ export interface Candidate {
   skills: string[];
   years_experience: number | null;
   resume_filename: string | null;
+  do_not_call: boolean;
   created_at: string;
   resume_text?: string;
 }
@@ -86,6 +88,7 @@ export interface Application {
     confirmed_slot: string | null;
     duration_minutes: number;
     invitation: { subject: string; body: string };
+    meeting?: { provider: string; event_id: string | null; join_url: string | null; booked_at: string };
   } | null;
   interview_notes: string | null;
   scorecard: Scorecard | null;
@@ -93,6 +96,50 @@ export interface Application {
   created_at: string;
   updated_at: string;
   pending_approval: Approval | null;
+  messages: Message[];
+  calls: Call[];
+}
+
+export interface Message {
+  id: string;
+  kind: "outreach" | "invitation" | "calendar_invite";
+  status: "draft" | "queued" | "sent" | "failed";
+  to: string | null;
+  subject: string;
+  body: string;
+  provider: string | null;
+  error: string | null;
+  sent_by: string | null;
+  sent_at: string | null;
+  created_at: string;
+}
+
+export type CallPurpose = "prescreen" | "schedule" | "reminder";
+
+export interface Call {
+  id: string;
+  purpose: CallPurpose;
+  status: "scheduled" | "queued" | "dialing" | "in_progress" | "completed" | "no_answer" | "declined" | "failed" | "canceled";
+  provider: "simulated" | "twilio";
+  to_number: string | null;
+  context: { questions?: string[]; slots?: { iso: string; label: string }[]; interview_label?: string };
+  transcript: { role: "agent" | "candidate"; text: string; at: string }[];
+  outcome: { consent?: string; opt_out?: boolean; wants_human?: boolean; booked_slot?: string; reminder_status?: string };
+  summary: {
+    summary: string;
+    interested?: boolean | null;
+    notice_period?: string | null;
+    salary_expectation?: string | null;
+    availability?: string | null;
+    answers: { question: string; answer: string }[];
+    concerns: string[];
+  } | null;
+  error: string | null;
+  requested_by: string | null;
+  scheduled_for: string | null;
+  started_at: string | null;
+  ended_at: string | null;
+  created_at: string;
 }
 
 export interface Event {
@@ -116,6 +163,7 @@ export interface Health {
   models: Record<string, string>;
   embeddings: string;
   database: string;
+  integrations: { email: "outbox" | "graph"; calendar: "local" | "graph"; voice: "simulated" | "twilio" };
 }
 
 export interface Stats {
@@ -200,7 +248,7 @@ export const api = {
 
   jobs: () => request<Job[]>("/jobs"),
   job: (id: string) => request<Job>(`/jobs/${id}`),
-  createJob: (body: Pick<Job, "title" | "department" | "location" | "description" | "requirements">) =>
+  createJob: (body: Pick<Job, "title" | "department" | "location" | "description" | "requirements" | "interviewer_emails">) =>
     request<Job>("/jobs", json("POST", body)),
   updateJob: (id: string, body: Partial<Job>) => request<Job>(`/jobs/${id}`, json("PATCH", body)),
   deleteJob: (id: string) => request<void>(`/jobs/${id}`, { method: "DELETE" }),
@@ -219,6 +267,15 @@ export const api = {
   },
   createCandidate: (body: { resume_text: string; name?: string; email?: string }) =>
     request<Candidate>("/candidates", json("POST", body)),
+  updateCandidate: (id: string, body: Partial<Pick<Candidate, "name" | "email" | "phone" | "location" | "do_not_call">>) =>
+    request<Candidate>(`/candidates/${id}`, json("PATCH", body)),
+  editMessage: (id: string, body: Partial<Pick<Message, "to" | "subject" | "body">>) => request<Message>(`/messages/${id}`, json("PATCH", body)),
+  sendMessage: (id: string) => request<Message>(`/messages/${id}/send`, json("POST")),
+  requestCall: (applicationId: string, purpose: CallPurpose) =>
+    request<Call>(`/applications/${applicationId}/calls`, json("POST", { purpose })),
+  cancelCall: (id: string) => request<Call>(`/calls/${id}/cancel`, json("POST")),
+  simulateReply: (id: string, text: string) => request<Call>(`/calls/${id}/simulate`, json("POST", { text })),
+  hangUp: (id: string) => request<Call>(`/calls/${id}/hang-up`, json("POST")),
   deleteCandidate: (id: string) => request<void>(`/candidates/${id}`, { method: "DELETE" }),
 
   application: (id: string) => request<Application>(`/applications/${id}`),

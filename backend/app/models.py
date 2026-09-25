@@ -61,6 +61,8 @@ class Job(Base):
     location: Mapped[str | None] = mapped_column(String(120))
     description: Mapped[str] = mapped_column(Text)
     requirements: Mapped[list[str]] = mapped_column(JSON, default=list)
+    # Interviewers whose calendars are checked for free slots and who join the Teams meeting.
+    interviewer_emails: Mapped[list[str]] = mapped_column(JSON, default=list)
     status: Mapped[JobStatus] = mapped_column(Enum(JobStatus), default=JobStatus.open)
     embedding: Mapped[list[float] | None] = mapped_column(EmbeddingType(EMBEDDING_DIM))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
@@ -81,6 +83,7 @@ class Candidate(Base):
     years_experience: Mapped[float | None] = mapped_column(Float)
     resume_text: Mapped[str] = mapped_column(Text)
     resume_filename: Mapped[str | None] = mapped_column(String(300))
+    do_not_call: Mapped[bool] = mapped_column(Boolean, default=False)  # set when a candidate opts out
     embedding: Mapped[list[float] | None] = mapped_column(EmbeddingType(EMBEDDING_DIM))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
@@ -111,6 +114,10 @@ class Application(Base):
     job: Mapped[Job] = relationship(back_populates="applications")
     candidate: Mapped[Candidate] = relationship(back_populates="applications")
     approvals: Mapped[list["Approval"]] = relationship(back_populates="application", cascade="all, delete-orphan")
+    messages: Mapped[list["Message"]] = relationship(
+        back_populates="application", cascade="all, delete-orphan", order_by="Message.created_at"
+    )
+    calls: Mapped[list["Call"]] = relationship(back_populates="application", cascade="all, delete-orphan", order_by="Call.created_at")
 
 
 class Approval(Base):
@@ -167,6 +174,10 @@ class User(Base):
 class TaskKind(str, enum.Enum):
     agent_step = "agent_step"  # run the agent for an application's current stage
     source = "source"  # run the sourcing agent for a job
+    send_email = "send_email"
+    book_meeting = "book_meeting"
+    place_call = "place_call"
+    summarize_call = "summarize_call"
 
 
 class TaskStatus(str, enum.Enum):
@@ -196,3 +207,83 @@ class AgentTask(Base):
     locked_by: Mapped[str | None] = mapped_column(String(100))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
+
+
+class MessageKind(str, enum.Enum):
+    outreach = "outreach"
+    invitation = "invitation"  # interview slot options
+    calendar_invite = "calendar_invite"  # the booked meeting (sent by the calendar system)
+
+
+class MessageStatus(str, enum.Enum):
+    draft = "draft"
+    queued = "queued"
+    sent = "sent"
+    failed = "failed"
+
+
+class Message(Base):
+    """An email to a candidate. Drafted by an agent; sent only when a person clicks Send."""
+
+    __tablename__ = "messages"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
+    application_id: Mapped[str] = mapped_column(ForeignKey("applications.id", ondelete="CASCADE"), index=True)
+    kind: Mapped[MessageKind] = mapped_column(Enum(MessageKind))
+    status: Mapped[MessageStatus] = mapped_column(Enum(MessageStatus), default=MessageStatus.draft)
+    to: Mapped[str | None] = mapped_column(String(320))
+    subject: Mapped[str] = mapped_column(String(500))
+    body: Mapped[str] = mapped_column(Text)
+    provider: Mapped[str | None] = mapped_column(String(30))  # "graph", or "outbox" when not actually sent
+    error: Mapped[str | None] = mapped_column(Text)
+    sent_by: Mapped[str | None] = mapped_column(String(200))
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+    application: Mapped[Application] = relationship(back_populates="messages")
+
+
+class CallPurpose(str, enum.Enum):
+    prescreen = "prescreen"
+    schedule = "schedule"
+    reminder = "reminder"
+
+
+class CallStatus(str, enum.Enum):
+    scheduled = "scheduled"  # waiting for its time (reminders)
+    queued = "queued"
+    dialing = "dialing"
+    in_progress = "in_progress"
+    completed = "completed"
+    no_answer = "no_answer"
+    declined = "declined"  # candidate didn't consent or opted out
+    failed = "failed"
+    canceled = "canceled"
+
+
+class Call(Base):
+    """An AI phone call to a candidate. Started only when a person clicks Call."""
+
+    __tablename__ = "calls"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
+    application_id: Mapped[str] = mapped_column(ForeignKey("applications.id", ondelete="CASCADE"), index=True)
+    purpose: Mapped[CallPurpose] = mapped_column(Enum(CallPurpose))
+    status: Mapped[CallStatus] = mapped_column(Enum(CallStatus), default=CallStatus.queued, index=True)
+    provider: Mapped[str] = mapped_column(String(30))
+    provider_sid: Mapped[str | None] = mapped_column(String(64), index=True)
+    to_number: Mapped[str | None] = mapped_column(String(50))
+    relay_token: Mapped[str] = mapped_column(String(64), default=lambda: uuid.uuid4().hex + uuid.uuid4().hex)
+    context: Mapped[dict] = mapped_column(JSON, default=dict)  # questions asked, slots offered, interview time
+    transcript: Mapped[list[dict]] = mapped_column(JSON, default=list)  # [{role: agent|candidate, text, at}]
+    outcome: Mapped[dict] = mapped_column(JSON, default=dict)  # consent, booked_slot, reminder_status, opt_out
+    summary: Mapped[dict | None] = mapped_column(JSON)
+    error: Mapped[str | None] = mapped_column(Text)
+    requested_by: Mapped[str | None] = mapped_column(String(200))
+    scheduled_for: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
+
+    application: Mapped[Application] = relationship(back_populates="calls")

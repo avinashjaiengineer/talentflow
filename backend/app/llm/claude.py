@@ -23,20 +23,20 @@ class ClaudeLLM:
             else anthropic.Anthropic()
         )
 
-    def _model_params(self, model: str) -> dict:
+    def _model_params(self, model: str, effort: str | None) -> dict:
         if model.startswith("claude-haiku"):
             # Haiku 4.5 predates adaptive thinking and effort.
             return {}
         params: dict = {
             "thinking": {"type": "adaptive"},
-            "output_config": {"effort": self.settings.llm_effort},
+            "output_config": {"effort": effort or self.settings.llm_effort},
         }
         if model in _FALLBACK_MODELS:
             params["betas"] = ["server-side-fallback-2026-07-01"]
             params["fallbacks"] = "default"
         return params
 
-    def structured(self, *, agent: str, system: str, prompt: str, schema: type[T]) -> T:
+    def structured(self, *, agent: str, system: str, prompt: str, schema: type[T], effort: str | None = None) -> T:
         model = self.settings.model_for(agent)
         try:
             response = self.client.beta.messages.parse(
@@ -45,7 +45,7 @@ class ClaudeLLM:
                 system=[{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
                 messages=[{"role": "user", "content": prompt}],
                 output_format=schema,
-                **self._model_params(model),
+                **self._model_params(model, effort),
             )
         except anthropic.AuthenticationError as e:
             raise LLMError("Anthropic API key is invalid or missing") from e

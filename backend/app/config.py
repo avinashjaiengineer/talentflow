@@ -78,6 +78,32 @@ class Settings(BaseSettings):
     def docs_enabled(self) -> bool:
         return self.enable_docs if self.enable_docs is not None else self.environment == "development"
 
+    # ---------------------------------------------------------------- integrations
+    # Email: "outbox" stores messages in TalentFlow without sending (safe default);
+    # "graph" sends through Microsoft 365 (Outlook).
+    email_provider: Literal["outbox", "graph"] = "outbox"
+    # Calendar: "local" proposes working-hours slots with no real calendar;
+    # "graph" reads Outlook free/busy and books Teams meetings.
+    calendar_provider: Literal["local", "graph"] = "local"
+    # Microsoft 365 app registration (client-credentials flow). MS_SENDER is the mailbox
+    # that sends email and organizes interviews, e.g. recruiting@yourcompany.com.
+    ms_tenant_id: str | None = None
+    ms_client_id: str | None = None
+    ms_client_secret: str | None = None
+    ms_sender: str | None = None
+
+    # Voice: "simulated" runs calls as a text chat inside TalentFlow; "twilio" places
+    # real phone calls (needs PUBLIC_BASE_URL on https so Twilio can reach wss://).
+    voice_provider: Literal["simulated", "twilio"] = "simulated"
+    twilio_account_sid: str | None = None
+    twilio_auth_token: str | None = None
+    twilio_from_number: str | None = None
+    public_base_url: str | None = None  # e.g. https://talent.example.com
+    voice_language: str = "en-US"
+    model_caller: str | None = None  # live calls need fast replies; e.g. claude-haiku-4-5
+    call_max_turns: int = 24
+    reminder_hours_before: int = 24
+
     def model_for(self, agent: str) -> str:
         return getattr(self, f"model_{agent}", None) or self.default_model
 

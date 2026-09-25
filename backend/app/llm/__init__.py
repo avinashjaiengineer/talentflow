@@ -18,7 +18,7 @@ class LLMError(RuntimeError):
 class LLM(Protocol):
     name: str
 
-    def structured(self, *, agent: str, system: str, prompt: str, schema: type[T]) -> T:
+    def structured(self, *, agent: str, system: str, prompt: str, schema: type[T], effort: str | None = None) -> T:
         """Run one call and return output validated against `schema`."""
         ...
 
@@ -28,7 +28,7 @@ class MockLLM:
 
     name = "mock"
 
-    def structured(self, *, agent: str, system: str, prompt: str, schema: type[T]) -> T:
+    def structured(self, *, agent: str, system: str, prompt: str, schema: type[T], effort: str | None = None) -> T:
         raise LLMError("MockLLM has no model; pass a heuristic to run_structured()")
 
 
@@ -43,9 +43,9 @@ def get_llm() -> LLM:
 
 
 def run_structured(
-    *, agent: str, system: str, prompt: str, schema: type[T], heuristic: Callable[[], T]
+    *, agent: str, system: str, prompt: str, schema: type[T], heuristic: Callable[[], T], effort: str | None = None
 ) -> T:
     llm = get_llm()
     if isinstance(llm, MockLLM):
         return heuristic()
-    return llm.structured(agent=agent, system=system, prompt=prompt, schema=schema)
+    return llm.structured(agent=agent, system=system, prompt=prompt, schema=schema, effort=effort)

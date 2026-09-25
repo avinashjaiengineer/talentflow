@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .. import orchestrator
+from .. import comms, orchestrator
 from ..db import get_db
 from ..models import AgentTask, Application, Approval, ApprovalStatus, Stage, User
 from ..schemas import ApplicationOut, ApprovalOut, Decision, Notes, RejectRequest, SlotChoice, TaskOut
@@ -63,7 +63,7 @@ def candidate_replied(application_id: str, user: User = Depends(current_user), d
 @router.post("/applications/{application_id}/confirm-slot", response_model=ApplicationOut)
 def confirm_slot(application_id: str, body: SlotChoice, user: User = Depends(current_user), db: Session = Depends(get_db)):
     app = _get_app(db, application_id)
-    _guard(orchestrator.confirm_slot, db, app, body.slot, by=user.name)
+    _guard(comms.confirm_and_book, db, app, body.slot, by=user.name)
     return application_out(app)
 
 

@@ -96,6 +96,7 @@ export default function JobDetail() {
         <summary className="cursor-pointer font-medium text-slate-700">Job description & requirements</summary>
         <p className="mt-3 whitespace-pre-wrap text-slate-600">{job.description}</p>
         <div className="mt-3 flex flex-wrap gap-1">{job.requirements.map((r) => <Badge key={r}>{r}</Badge>)}</div>
+        {job.interviewer_emails.length > 0 && <p className="mt-3 text-xs text-slate-500">Interviewers: {job.interviewer_emails.join(", ")}</p>}
         <div className="mt-4 flex gap-2">
           <Button variant="secondary" onClick={() => toggleStatus.mutate()} loading={toggleStatus.isPending}>
             {job.status === "open" ? "Close job" : "Reopen job"}

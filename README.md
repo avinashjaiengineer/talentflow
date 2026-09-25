@@ -15,10 +15,11 @@ Five specialist AI agents source, screen, contact, schedule, and evaluate candid
 2. Create a **job** with a few specific requirements.
 3. Click **Source candidates**. The agents find and screen the best matches.
 4. Review each recommendation in **Approvals** and choose to advance or reject.
-5. The agents draft the outreach email and propose interview slots.
-6. After the interview, paste your notes to get a scorecard, then make the offer decision.
+5. Send the drafted outreach email, or have the AI agent **call** the candidate for a quick pre-screen.
+6. Book the interview. The agent can call to agree a time, and TalentFlow creates the Teams meeting and a reminder call.
+7. After the interview, paste your notes to get a scorecard, then make the offer decision.
 
-**New here?** Read the **[user guide](docs/USER_GUIDE.md)** for how the platform works and how to use every screen.
+**New here?** Read the **[user guide](docs/USER_GUIDE.md)** for how the platform works and how to use every screen. To connect Outlook, Teams, and phone calls, see **[integrations](docs/INTEGRATIONS.md)**.
 
 ## Screenshots
 
@@ -27,6 +28,7 @@ Five specialist AI agents source, screen, contact, schedule, and evaluate candid
 | ![Dashboard](docs/screenshots/dashboard.jpg) **Dashboard.** Pipeline at a glance and a live feed of agent activity. | ![Approvals](docs/screenshots/approvals.jpg) **Approvals.** The review queue, strongest candidates first. Agents recommend; you decide. |
 | ![Candidate approval](docs/screenshots/candidate-approval.jpg) **Candidate review.** The agent's recommendation, the approval gate, and the full timeline. | ![Screening evidence](docs/screenshots/screening-evidence.jpg) **Evidence-based screening.** Every requirement checked, with a quote from the resume. |
 | ![Talent pool](docs/screenshots/talent-pool.jpg) **Talent pool.** Upload PDF, DOCX, or TXT resumes; Claude parses the skills and experience. | ![Agent activity](docs/screenshots/agent-activity.jpg) **Audit trail.** Every agent action and human decision, with who made it. |
+| ![AI pre-screen call summary](docs/screenshots/ai-call-summary.jpg) **AI pre-screen call.** Interest, notice period, and salary pulled from the call, concerns flagged, full transcript kept. | ![Call transcript and email draft](docs/screenshots/ai-call-transcript.jpg) **Transcript and outreach.** The agent handles "sorry, what was the question?", and the personalized email waits for **Send**. |
 
 _All screenshots show demo data from `python -m app.seed`, screened by Claude Opus 5._
 
@@ -38,8 +40,9 @@ _All screenshots show demo data from `python -m app.seed`, screened by Claude Op
 
 - **Semantic sourcing.** Resumes and jobs are embedded with pgvector, so "built RAG pipelines" matches a job asking for "LLM applications" even with zero shared keywords.
 - **Evidence-based screening.** Each requirement is marked met, partial, or not met, with a quote from the resume. The agent is instructed to ignore protected characteristics.
-- **Personalized outreach.** Emails reference what actually makes the candidate a fit.
-- **Scheduling.** The agent proposes interview slots within working hours in your timezone and drafts the invitation.
+- **Personalized outreach.** Emails reference what actually makes the candidate a fit. Recruiters edit them and click **Send**, and they go out from **Outlook**.
+- **Real scheduling.** Proposed slots avoid interviewers' busy times, and the interview is booked in Outlook with a **Teams meeting**. Invitations are sent automatically.
+- **AI calling agent.** Pre-screen calls, scheduling calls that book the slot the candidate picks, and interview reminders over real phone calls through **Twilio**. The agent discloses that it's an AI, asks for consent, honors "don't call me", and saves a transcript and summary. You can try it in the app with simulated calls before connecting a phone number.
 - **Structured scorecards.** Interview notes become per-competency ratings, a hire recommendation, and risks to probe.
 - **Human approval gates.** A person decides to advance or reject after screening, and to offer or reject after evaluation.
 - **Full audit trail.** Every agent action and human decision is written to an append-only event log, with who made it.
@@ -196,8 +199,10 @@ Before using AI screening in production, check the rules where you hire. Example
 
 ## Roadmap
 
-- [ ] Send email through SMTP, Gmail, or Outlook, and ingest replies automatically
-- [ ] Calendar integration (Google or Microsoft) for real availability
+- [x] Outlook email, Outlook calendar, and Teams meetings
+- [x] AI calling agent: pre-screen, scheduling, and reminders (Twilio)
+- [ ] Ingest candidate email replies automatically
+- [ ] Google Workspace (Gmail, Calendar, Meet)
 - [ ] SSO (Google or Microsoft)
 - [ ] Import candidates from LinkedIn, Greenhouse, or Lever
 - [ ] Adverse-impact reporting dashboard

@@ -29,6 +29,7 @@ def health():
         models={} if mock else {a: s.model_for(a) for a in AGENTS},
         embeddings=type(get_embedder()).__name__.removesuffix("Embedder").lower(),
         database=engine.dialect.name,
+        integrations={"email": s.email_provider, "calendar": s.calendar_provider, "voice": s.voice_provider},
     )
 
 

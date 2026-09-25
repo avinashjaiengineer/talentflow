@@ -58,7 +58,7 @@ export default function JobsPage() {
 function JobForm({ open, onClose }: { open: boolean; onClose: () => void }) {
   const qc = useQueryClient();
   const navigate = useNavigate();
-  const [form, setForm] = useState({ title: "", department: "", location: "", description: "", requirements: "" });
+  const [form, setForm] = useState({ title: "", department: "", location: "", description: "", requirements: "", interviewers: "" });
   const create = useMutation({
     mutationFn: () =>
       api.createJob({
@@ -67,6 +67,7 @@ function JobForm({ open, onClose }: { open: boolean; onClose: () => void }) {
         location: form.location || null,
         description: form.description,
         requirements: form.requirements.split("\n").map((r) => r.trim()).filter(Boolean),
+        interviewer_emails: form.interviewers.split(/[\s,;]+/).map((e) => e.trim()).filter(Boolean),
       }),
     onSuccess: (job) => {
       qc.invalidateQueries({ queryKey: ["jobs"] });
@@ -107,6 +108,11 @@ function JobForm({ open, onClose }: { open: boolean; onClose: () => void }) {
         <div>
           <label className="label">Requirements (one per line)</label>
           <textarea className="input min-h-24" value={form.requirements} onChange={set("requirements")} placeholder={"5+ years backend development\nPython\nPostgreSQL"} />
+        </div>
+        <div>
+          <label className="label">Interviewers' emails (optional, comma-separated)</label>
+          <input className="input" value={form.interviewers} onChange={set("interviewers")} placeholder="lead@yourcompany.com, manager@yourcompany.com" />
+          <p className="mt-1 text-xs text-slate-500">Interview slots avoid their busy times, and they're invited to the Teams meeting.</p>
         </div>
         <ErrorNote error={create.error} />
         <div className="flex justify-end gap-2 pt-2">

@@ -39,9 +39,9 @@ def format_slot(t: datetime) -> str:
     return f"{t:%A, %B %d at %H:%M} ({get_settings().timezone})"
 
 
-def plan(job: Job, candidate: Candidate) -> dict:
+def plan(job: Job, candidate: Candidate, slots: list[datetime] | None = None) -> dict:
     s = get_settings()
-    slots = propose_slots()
+    slots = slots if slots is not None else propose_slots()
     labels = [format_slot(t) for t in slots]
     first_name = candidate.name.split()[0] if candidate.name else "there"
     listed = "\n".join(f"- {label}" for label in labels)

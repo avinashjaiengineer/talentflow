@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 from .agents import evaluation, outreach, scheduling, screening, sourcing
 from .embeddings import embed_one
 from .events import log_event
+from .llm import LLMError
 from .models import (
     AgentTask,
     Application,
@@ -27,6 +28,7 @@ from .models import (
     ApprovalKind,
     ApprovalStatus,
     Job,
+    MessageKind,
     Stage,
     TaskKind,
     TaskStatus,
@@ -119,14 +121,25 @@ def run_agent_step(db: Session, app: Application) -> None:
                   message="Waiting for a recruiter to advance or reject", application=app)
 
     elif app.stage == Stage.outreach:
+        from . import comms
+
         draft = outreach.draft(job, candidate, app.screening)
-        app.outreach = {**draft.model_dump(), "to": candidate.email, "sent_at": datetime.now(UTC).isoformat()}
-        log_event(db, actor="outreach", type="outreach_sent",
-                  message=f"Emailed {candidate.email or candidate.name}: {draft.subject}", application=app)
+        msg = comms.draft_message(db, app, MessageKind.outreach, subject=draft.subject, body=draft.body)
+        app.outreach = {**draft.model_dump(), "to": candidate.email, "message_id": msg.id}
+        log_event(db, actor="outreach", type="outreach_drafted",
+                  message=f"Drafted an email to {candidate.email or candidate.name}: {draft.subject}. Waiting for a recruiter to send it",
+                  application=app)
         _move(db, app, Stage.contacted, actor="orchestrator")
 
     elif app.stage == Stage.scheduling:
-        app.scheduling = scheduling.plan(job, candidate)
+        from . import comms
+
+        slots = comms.free_slots(job)
+        if not slots:
+            raise LLMError("No free interview slots in the next two weeks; check the interviewers' calendars")
+        app.scheduling = scheduling.plan(job, candidate, slots)
+        invitation = app.scheduling["invitation"]
+        comms.draft_message(db, app, MessageKind.invitation, subject=invitation["subject"], body=invitation["body"])
         log_event(db, actor="scheduling", type="slots_proposed",
                   message=f"Proposed {len(app.scheduling['proposed_slots'])} interview slots",
                   application=app, data={"slots": app.scheduling["proposed_slots"]})
