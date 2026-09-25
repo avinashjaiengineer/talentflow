@@ -6,6 +6,18 @@ Five specialist AI agents source, screen, contact, schedule, and evaluate candid
 
 ![Pipeline board: candidates sourced and screened by Claude, ranked by fit](docs/screenshots/pipeline-board.jpg)
 
+## Overview
+
+**What it's for.** TalentFlow takes the repetitive work out of hiring without taking people out of the decisions. Recruiters spend hours reading resumes, writing outreach, and chasing interview times. TalentFlow's agents do that reading and writing in seconds, and explain every judgment with evidence from the resume, so your team can spend its time on the candidates who matter.
+
+**How to use it.**
+1. Upload resumes to the **talent pool**.
+2. Create a **job** with a few specific requirements.
+3. Click **Source candidates**. The agents find and screen the best matches.
+4. Review each recommendation in **Approvals** and choose to advance or reject.
+5. The agents draft the outreach email and propose interview slots.
+6. After the interview, paste your notes to get a scorecard, then make the offer decision.
+
 **New here?** Read the **[user guide](docs/USER_GUIDE.md)** for how the platform works and how to use every screen.
 
 ## Screenshots
