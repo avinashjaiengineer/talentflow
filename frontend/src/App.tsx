@@ -25,7 +25,7 @@ const NAV = [
 export default function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const { user, logout } = useAuth();
-  const { data: health } = useQuery({ queryKey: ["health"], queryFn: api.health, staleTime: 60_000 });
+  const { data: health } = useQuery({ queryKey: ["system"], queryFn: api.system, staleTime: 60_000 });
   const { data: stats } = useQuery({ queryKey: ["stats"], queryFn: api.stats, refetchInterval: 5_000 });
 
   const nav = (

@@ -55,6 +55,7 @@ function ChangePassword() {
 function Users({ me }: { me: User }) {
   const qc = useQueryClient();
   const [adding, setAdding] = useState(false);
+  const [resetting, setResetting] = useState<User | null>(null);
   const { data: users = [] } = useQuery({ queryKey: ["users"], queryFn: api.users });
   const update = useMutation({
     mutationFn: (v: { id: string; body: Parameters<typeof api.updateUser>[1] }) => api.updateUser(v.id, v.body),
@@ -90,9 +91,12 @@ function Users({ me }: { me: User }) {
                 <option value="admin">Admin</option>
               </select>
               {u.id !== me.id && (
-                <Button variant={u.is_active ? "danger" : "secondary"} onClick={() => update.mutate({ id: u.id, body: { is_active: !u.is_active } })}>
-                  {u.is_active ? "Deactivate" : "Reactivate"}
-                </Button>
+                <>
+                  <Button variant="secondary" onClick={() => setResetting(u)}>Reset password</Button>
+                  <Button variant={u.is_active ? "danger" : "secondary"} onClick={() => update.mutate({ id: u.id, body: { is_active: !u.is_active } })}>
+                    {u.is_active ? "Deactivate" : "Reactivate"}
+                  </Button>
+                </>
               )}
             </div>
           </li>
@@ -100,6 +104,7 @@ function Users({ me }: { me: User }) {
       </ul>
       <ErrorNote error={update.error} />
       <AddUser open={adding} onClose={() => setAdding(false)} />
+      {resetting && <ResetPassword user={resetting} onClose={() => setResetting(null)} />}
     </Card>
   );
 }
@@ -147,6 +152,41 @@ function AddUser({ open, onClose }: { open: boolean; onClose: () => void }) {
           <Button type="submit" loading={create.isPending}>Add user</Button>
         </div>
       </form>
+    </Modal>
+  );
+}
+
+function ResetPassword({ user, onClose }: { user: User; onClose: () => void }) {
+  const [password, setPassword] = useState("");
+  const reset = useMutation({ mutationFn: () => api.updateUser(user.id, { password }) });
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    reset.mutate();
+  };
+  return (
+    <Modal open onClose={onClose} title={`Reset password for ${user.name}`}>
+      {reset.isSuccess ? (
+        <div className="space-y-3">
+          <p className="text-sm text-emerald-700">
+            Password updated and {user.name} was signed out everywhere. Share the new password privately; they can change it under Settings.
+          </p>
+          <div className="flex justify-end">
+            <Button onClick={onClose}>Done</Button>
+          </div>
+        </div>
+      ) : (
+        <form onSubmit={submit} className="space-y-3">
+          <div>
+            <label className="label">New temporary password (10+ characters)</label>
+            <input type="text" autoComplete="off" minLength={10} required className="input font-mono" value={password} onChange={(e) => setPassword(e.target.value)} />
+          </div>
+          <ErrorNote error={reset.error} />
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
+            <Button type="submit" loading={reset.isPending}>Reset password</Button>
+          </div>
+        </form>
+      )}
     </Modal>
   );
 }

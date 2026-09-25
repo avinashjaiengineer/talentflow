@@ -16,9 +16,15 @@ router = APIRouter(tags=["system"])
 AGENTS = ("sourcing", "screening", "outreach", "scheduling", "evaluation")
 
 
-@public_router.get("/health", response_model=Health)
+@public_router.get("/health")
 def health():
-    """Liveness: the process is up. Does not touch the database."""
+    """Liveness: the process is up. Public, so it reveals nothing about the configuration."""
+    return {"status": "ok", "version": __version__}
+
+
+@router.get("/system", response_model=Health)
+def system_info():
+    """Configuration summary for signed-in users (sidebar, admin checks)."""
     s = get_settings()
     mock = isinstance(get_llm(), MockLLM)
     return Health(

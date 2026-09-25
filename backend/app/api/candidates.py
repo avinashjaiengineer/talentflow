@@ -78,7 +78,7 @@ def candidate_applications(candidate_id: str, db: Session = Depends(get_db)):
     candidate = db.get(Candidate, candidate_id)
     if candidate is None:
         raise HTTPException(404, "Candidate not found")
-    return [application_out(a) for a in candidate.applications]
+    return [application_out(a, detail=False) for a in candidate.applications]
 
 
 @router.patch("/{candidate_id}", response_model=CandidateDetail)

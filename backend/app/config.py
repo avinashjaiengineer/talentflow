@@ -59,6 +59,16 @@ class Settings(BaseSettings):
     working_hours_end: int = 17
 
     @model_validator(mode="after")
+    def _check_timezone(self) -> "Settings":
+        from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+        try:
+            ZoneInfo(self.timezone)
+        except (ZoneInfoNotFoundError, ValueError) as e:
+            raise ValueError(f"TIMEZONE {self.timezone!r} is not a valid IANA zone, e.g. 'Asia/Kolkata'") from e
+        return self
+
+    @model_validator(mode="after")
     def _check_production(self) -> "Settings":
         if self.environment == "production":
             if len(self.secret_key) < 32:

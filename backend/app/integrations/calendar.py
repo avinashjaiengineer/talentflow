@@ -20,7 +20,10 @@ class Meeting:
 class Calendar(Protocol):
     name: str
 
-    def free_slots(self, attendees: list[str], *, count: int, duration: timedelta, now: datetime | None = None) -> list[datetime]: ...
+    def free_slots(
+        self, attendees: list[str], *, count: int, duration: timedelta, now: datetime | None = None,
+        busy: list[tuple[datetime, datetime]] = (),
+    ) -> list[datetime]: ...
 
     def create_meeting(
         self, *, subject: str, body: str, start: datetime, duration: timedelta, attendees: list[tuple[str, str]]
@@ -42,6 +45,10 @@ def candidate_starts(now: datetime, duration: timedelta, days: int = 10) -> list
                 t += timedelta(minutes=30)
         day += timedelta(days=1)
     return starts
+
+
+def without(starts: list[datetime], duration: timedelta, busy) -> list[datetime]:
+    return [t for t in starts if not any(t < b_end and t + duration > b_start for b_start, b_end in busy)]
 
 
 def spread(starts: list[datetime], count: int) -> list[datetime]:
@@ -68,8 +75,8 @@ class LocalCalendar:
 
     name = "local"
 
-    def free_slots(self, attendees, *, count, duration, now=None):
-        return spread(candidate_starts(now or datetime.now(UTC), duration), count)
+    def free_slots(self, attendees, *, count, duration, now=None, busy=()):
+        return spread(without(candidate_starts(now or datetime.now(UTC), duration), duration, busy), count)
 
     def create_meeting(self, *, subject, body, start, duration, attendees):
         return Meeting(event_id=None, join_url=None, provider=self.name)
@@ -102,13 +109,12 @@ class GraphCalendar:
                     periods.append((_parse_utc(item["start"]["dateTime"]), _parse_utc(item["end"]["dateTime"])))
         return periods
 
-    def free_slots(self, attendees, *, count, duration, now=None):
+    def free_slots(self, attendees, *, count, duration, now=None, busy=()):
         starts = candidate_starts(now or datetime.now(UTC), duration)
         if not starts:
             return []
-        busy = self.busy_periods(attendees or [self.client.sender], starts[0], starts[-1] + duration)
-        free = [t for t in starts if not any(t < b_end and t + duration > b_start for b_start, b_end in busy)]
-        return spread(free, count)
+        calendar_busy = self.busy_periods(attendees or [self.client.sender], starts[0], starts[-1] + duration)
+        return spread(without(starts, duration, [*calendar_busy, *busy]), count)
 
     def create_meeting(self, *, subject, body, start, duration, attendees):
         r = self.client.request(

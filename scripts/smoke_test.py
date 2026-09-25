@@ -85,18 +85,20 @@ def main() -> int:
         print(f"[{time.monotonic() - t0:6.1f}s] {msg}", flush=True)
 
     _, headers, health = c.call("GET", "/api/health")
-    step(f"health ok: v{health['version']} env={health['environment']} llm={health['llm']} db={health['database']}")
-    assert health["environment"] == "production", "server is not in production mode"
+    assert set(health) == {"status", "version"}, "public health check should not reveal configuration"
     assert headers.get("X-Content-Type-Options") == "nosniff" and "default-src 'self'" in headers.get("Content-Security-Policy", "")
     c.call("GET", "/api/ready")
     c.call("GET", "/api/jobs", expect=(401,))
+    c.call("GET", "/api/system", expect=(401,))
     c.call("GET", "/docs", expect=(200,))  # SPA fallback, not Swagger: docs are off in production
-    step("security headers present, API requires sign-in, readiness ok")
+    step(f"v{health['version']}: security headers present, API requires sign-in, readiness ok")
 
     c.call("POST", "/api/auth/login", {"email": env["ADMIN_EMAIL"], "password": "definitely-wrong"}, expect=(401,))
     c.call("POST", "/api/auth/login", {"email": env["ADMIN_EMAIL"], "password": env["ADMIN_PASSWORD"]})
     _, _, me = c.call("GET", "/api/auth/me")
-    step(f"signed in as {me['email']} ({me['role']})")
+    _, _, system = c.call("GET", "/api/system")
+    assert system["environment"] == "production", "server is not in production mode"
+    step(f"signed in as {me['email']} ({me['role']}); env={system['environment']} llm={system['llm']} db={system['database']}")
 
     _, _, job = c.call("POST", "/api/jobs", {
         "title": f"[smoke test {tag}] Senior Backend Engineer",

@@ -107,9 +107,30 @@ def run_send_email(db: Session, message_id: str) -> None:
 # ---------------------------------------------------------------- interview booking
 
 
-def free_slots(job, count: int = 3) -> list[datetime]:
+def _booked_conflicts(db: Session, job, *, exclude_application: str | None = None) -> list[tuple[datetime, datetime]]:
+    """Interviews already booked in TalentFlow that share this job or any of its interviewers."""
     duration = timedelta(minutes=get_settings().interview_duration_minutes)
-    return get_calendar().free_slots(list(job.interviewer_emails or []), count=count, duration=duration)
+    interviewers = {e.lower() for e in job.interviewer_emails or []}
+    busy = []
+    rows = db.execute(
+        select(Application).where(Application.stage.in_([Stage.interview_scheduled, Stage.evaluation, Stage.evaluated]))
+    ).scalars()
+    for other in rows:
+        slot = (other.scheduling or {}).get("confirmed_slot")
+        if not slot or other.id == exclude_application:
+            continue
+        shared = other.job_id == job.id or interviewers & {e.lower() for e in other.job.interviewer_emails or []}
+        if shared:
+            start = datetime.fromisoformat(slot)
+            busy.append((start, start + duration))
+    return busy
+
+
+def free_slots(db: Session, job, count: int = 3) -> list[datetime]:
+    duration = timedelta(minutes=get_settings().interview_duration_minutes)
+    return get_calendar().free_slots(
+        list(job.interviewer_emails or []), count=count, duration=duration, busy=_booked_conflicts(db, job)
+    )
 
 
 def run_book_meeting(db: Session, app: Application) -> None:
@@ -146,6 +167,12 @@ def run_book_meeting(db: Session, app: Application) -> None:
 
 
 def confirm_and_book(db: Session, app: Application, slot: str, *, by: str) -> None:
+    if slot not in (app.scheduling or {}).get("proposed_slots", []):
+        raise TransitionError("Slot is not one of the proposed slots")
+    start = datetime.fromisoformat(slot)
+    end = start + timedelta(minutes=get_settings().interview_duration_minutes)
+    if any(start < b_end and end > b_start for b_start, b_end in _booked_conflicts(db, app.job, exclude_application=app.id)):
+        raise TransitionError("That time is already booked for another interview; pick another slot")
     orchestrator.confirm_slot(db, app, slot, by=by)  # commits
     enqueue(db, TaskKind.book_meeting, application_id=app.id)
     db.commit()
@@ -185,8 +212,8 @@ def request_call(db: Session, app: Application, purpose: CallPurpose, *, by: str
     if db.scalar(select(Call.id).where(Call.application_id == app.id, Call.status.in_(ACTIVE_CALL)).limit(1)):
         raise TransitionError("There's already a call in progress or scheduled for this candidate")
     sched = app.scheduling or {}
-    if purpose == CallPurpose.prescreen and app.stage not in (Stage.contacted, Stage.screened):
-        raise TransitionError("Pre-screen calls happen after screening, before scheduling")
+    if purpose == CallPurpose.prescreen and app.stage != Stage.contacted:
+        raise TransitionError("Pre-screen calls happen after a recruiter advances the candidate, before scheduling")
     if purpose == CallPurpose.schedule and (app.stage != Stage.interview_scheduled or sched.get("confirmed_slot")):
         raise TransitionError("Scheduling calls need proposed slots and no booked interview")
     if purpose == CallPurpose.reminder and not sched.get("confirmed_slot"):
@@ -228,9 +255,22 @@ def run_place_call(db: Session, call_id: str) -> None:
     call = db.get(Call, call_id)
     if call is None or call.status not in (CallStatus.scheduled, CallStatus.queued):
         return
-    if call.application.candidate.do_not_call:
+    app = call.application
+    reason = None
+    if app.candidate.do_not_call:
+        reason = "the candidate opted out of calls"
+    elif app.stage in (Stage.rejected, Stage.offer):
+        reason = f"the candidate is {app.stage.value}"
+    elif call.purpose == CallPurpose.reminder:
+        slot = (app.scheduling or {}).get("confirmed_slot")
+        label = format_slot(datetime.fromisoformat(slot)) if slot else None
+        if app.stage != Stage.interview_scheduled or label != call.context.get("interview_label"):
+            reason = "the interview is no longer at that time"
+    if reason:
         call.status = CallStatus.canceled
-        call.error = "Candidate opted out of calls"
+        call.error = f"Canceled: {reason}"
+        log_event(db, actor="orchestrator", type="call_canceled", message=f"Didn't place the {call.purpose.value} call: {reason}",
+                  application=app)
         return
     voice = get_voice()
     sid = voice.place_call(call_id=call.id, to_number=call.to_number, relay_token=call.relay_token, greeting=call.transcript[0]["text"])
@@ -320,11 +360,40 @@ def run_summarize_call(db: Session, call_id: str) -> None:
         log_event(db, actor="caller", type="needs_human", message="Candidate asked to speak with a recruiter", application=app)
     if call.purpose == CallPurpose.schedule and outcome.get("booked_slot"):
         if app.stage == Stage.interview_scheduled and not (app.scheduling or {}).get("confirmed_slot"):
-            orchestrator.confirm_slot(db, app, outcome["booked_slot"], by="AI scheduling call")
-            enqueue(db, TaskKind.book_meeting, application_id=app.id)
+            try:
+                confirm_and_book(db, app, outcome["booked_slot"], by="AI scheduling call")
+            except TransitionError as e:  # someone else took that time since the call started
+                log_event(db, actor="orchestrator", type="booking_conflict",
+                          message=f"The time chosen on the call is no longer free ({e}). Please pick another slot.",
+                          application=app)
     if call.purpose == CallPurpose.reminder and outcome.get("reminder_status"):
         verb = "confirmed they'll attend" if outcome["reminder_status"] == "confirmed" else "asked to reschedule"
         log_event(db, actor="caller", type="reminder_result", message=f"Candidate {verb}", application=app)
+
+
+def on_task_failed(db: Session, kind: TaskKind, payload: dict, error: Exception) -> bool:
+    """Record a permanent failure where the recruiter will see it.
+    Returns True when the failure belongs on the application itself (with a Retry button)."""
+    if kind == TaskKind.place_call:
+        call = db.get(Call, payload.get("call_id"))
+        if call is not None and call.status in (CallStatus.scheduled, CallStatus.queued):
+            call.status = CallStatus.failed
+            call.error = str(error)
+            call.ended_at = _now()
+        return False
+    if kind == TaskKind.send_email:
+        msg = db.get(Message, payload.get("message_id"))
+        if msg is not None and msg.status == MessageStatus.queued:
+            msg.status = MessageStatus.failed
+            msg.error = str(error)
+        return False
+    if kind == TaskKind.summarize_call:
+        call = db.get(Call, payload.get("call_id"))
+        if call is not None and call.summary is None:
+            call.summary = {"summary": f"This call couldn't be summarized ({error}). The full transcript is below.",
+                            "answers": [], "concerns": []}
+        return False
+    return True
 
 
 def run_task(db: Session, kind: TaskKind, application_id: str | None, payload: dict) -> None:

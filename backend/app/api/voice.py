@@ -97,5 +97,13 @@ async def relay(websocket: WebSocket, call_id: str, token: str = ""):
         pass
     except Exception:
         log.exception("call %s relay crashed", call_id)
+        # Don't leave the candidate in silence: apologize, then end the call cleanly.
+        try:
+            await websocket.send_json({"type": "text", "last": True,
+                                       "token": "Sorry, I'm having a technical problem. The recruiting team will follow up with you. Goodbye."})
+            await asyncio.sleep(6)
+            await websocket.send_json({"type": "end", "handoffData": json.dumps({"reason": "agent error"})})
+        except Exception:
+            pass
     finally:
         await run_in_threadpool(comms.end_call, call_id)

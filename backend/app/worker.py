@@ -106,7 +106,8 @@ def execute(task_id: int) -> None:
         else:
             task.status = TaskStatus.failed
         app = db.get(Application, task.application_id) if task.application_id else None
-        if app is not None:
+        show_on_app = True if will_retry else comms.on_task_failed(db, task.kind, task.payload or {}, error)
+        if app is not None and show_on_app:
             app.error = f"{error} (retrying, attempt {task.attempts} of {max_attempts})" if will_retry else str(error)
         log_event(db, actor="orchestrator", type="agent_retrying" if will_retry else "agent_failed",
                   message=str(error), application=app, job_id=task.job_id)

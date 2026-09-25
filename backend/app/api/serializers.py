@@ -1,3 +1,5 @@
+from sqlalchemy.orm import selectinload
+
 from ..models import Application, Approval, ApprovalKind, ApprovalStatus
 from ..schemas import ApplicationOut, ApprovalOut, CallOut, CandidateOut, MessageOut
 
@@ -20,7 +22,12 @@ def approval_rank(out: ApprovalOut) -> float:
     return (out.kind == ApprovalKind.offer) + fraction
 
 
-def application_out(app: Application) -> ApplicationOut:
+# Relationships every application view needs; loading them up front avoids a query per row.
+LIST_LOAD = (selectinload(Application.candidate), selectinload(Application.job), selectinload(Application.approvals))
+
+
+def application_out(app: Application, *, detail: bool = True) -> ApplicationOut:
+    """detail=False leaves out emails and call transcripts, which list and board views don't show."""
     pending = next((a for a in app.approvals if a.status == ApprovalStatus.pending), None)
     return ApplicationOut(
         id=app.id,
@@ -39,6 +46,6 @@ def application_out(app: Application) -> ApplicationOut:
         created_at=app.created_at,
         updated_at=app.updated_at,
         pending_approval=approval_out(pending) if pending else None,
-        messages=[MessageOut.model_validate(m) for m in app.messages],
-        calls=[CallOut.model_validate(c) for c in app.calls],
+        messages=[MessageOut.model_validate(m) for m in app.messages] if detail else [],
+        calls=[CallOut.model_validate(c) for c in app.calls] if detail else [],
     )

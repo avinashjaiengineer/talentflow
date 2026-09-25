@@ -27,10 +27,12 @@ def _source(client, work, job_id, limit, auto_screen=True):
 
 def test_health_is_public(anon):
     body = anon.get("/api/health").json()
-    assert body["status"] == "ok"
-    assert body["llm"].startswith("mock")
-    assert body["database"] in ("sqlite", "postgresql")
+    assert body["status"] == "ok" and body["version"]
     assert anon.get("/api/ready").json() == {"status": "ready"}
+    anon.post("/api/auth/login", json={"email": "admin@example.com", "password": "admin-password-123"})
+    system = anon.get("/api/system").json()
+    assert system["llm"].startswith("mock")
+    assert system["database"] in ("sqlite", "postgresql")
 
 
 def test_resume_upload_parses_profile(client):

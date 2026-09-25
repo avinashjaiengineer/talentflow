@@ -239,7 +239,7 @@ export const api = {
     request<User>(`/users/${id}`, json("PATCH", body)),
   task: (id: number) => request<Task>(`/tasks/${id}`),
 
-  health: () => request<Health>("/health"),
+  system: () => request<Health>("/system"),
   stats: () => request<Stats>("/stats"),
   events: (params: { application_id?: string; job_id?: string; limit?: number } = {}) => {
     const q = new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)]));

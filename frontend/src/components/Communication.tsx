@@ -18,7 +18,7 @@ const STATUS_TONE: Record<string, string> = {
 };
 
 function useIntegrations() {
-  const { data } = useQuery({ queryKey: ["health"], queryFn: api.health, staleTime: 60_000 });
+  const { data } = useQuery({ queryKey: ["system"], queryFn: api.system, staleTime: 60_000 });
   return data?.integrations;
 }
 
@@ -148,7 +148,7 @@ export function CallsSection({ app }: { app: Application }) {
   const sched = app.scheduling;
   const busy = app.calls.some((c) => ACTIVE.has(c.status));
   const options: { purpose: CallPurpose; hint: string }[] = [];
-  if (app.stage === "contacted" || app.stage === "screened")
+  if (app.stage === "contacted")
     options.push({ purpose: "prescreen", hint: "Confirms interest and asks a few questions about the role" });
   if (app.stage === "interview_scheduled" && sched && !sched.confirmed_slot)
     options.push({ purpose: "schedule", hint: "Offers the proposed slots and books the one they pick" });

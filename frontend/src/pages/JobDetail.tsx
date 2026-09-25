@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Search, Sparkles, Trash2, UserPlus } from "lucide-react";
+import { ArrowLeft, Pencil, Search, Sparkles, Trash2, UserPlus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { api, type Application, type Stage } from "../api";
+import { api, type Application, type Job, type Stage } from "../api";
 import ApplicationPanel from "../components/ApplicationPanel";
 import { Badge, Button, Card, Empty, ErrorNote, Modal, PageHeader, Recommendation, STAGE_META, ScoreBadge, StageBadge } from "../components/ui";
 
@@ -21,6 +21,7 @@ export default function JobDetail() {
   const [selected, setSelected] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [showRejected, setShowRejected] = useState(false);
+  const [editing, setEditing] = useState(false);
 
   const { data: job, error } = useQuery({ queryKey: ["job", jobId], queryFn: () => api.job(jobId) });
   const { data: apps = [] } = useQuery({
@@ -98,6 +99,7 @@ export default function JobDetail() {
         <div className="mt-3 flex flex-wrap gap-1">{job.requirements.map((r) => <Badge key={r}>{r}</Badge>)}</div>
         {job.interviewer_emails.length > 0 && <p className="mt-3 text-xs text-slate-500">Interviewers: {job.interviewer_emails.join(", ")}</p>}
         <div className="mt-4 flex gap-2">
+          <Button variant="secondary" onClick={() => setEditing(true)}><Pencil className="size-4" /> Edit</Button>
           <Button variant="secondary" onClick={() => toggleStatus.mutate()} loading={toggleStatus.isPending}>
             {job.status === "open" ? "Close job" : "Reopen job"}
           </Button>
@@ -149,6 +151,7 @@ export default function JobDetail() {
         {selected && <ApplicationPanel applicationId={selected} />}
       </Modal>
       <AddCandidate jobId={jobId} open={adding} onClose={() => setAdding(false)} existing={apps} />
+      {editing && <EditJob job={job} onClose={() => setEditing(false)} />}
     </>
   );
 }
@@ -202,6 +205,81 @@ function AddCandidate({ jobId, open, onClose, existing }: { jobId: string; open:
         {!candidates.length && <li className="py-6 text-center text-sm text-slate-500">No candidates found.</li>}
       </ul>
       <ErrorNote error={add.error} />
+    </Modal>
+  );
+}
+
+function EditJob({ job, onClose }: { job: Job; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [form, setForm] = useState({
+    title: job.title,
+    department: job.department ?? "",
+    location: job.location ?? "",
+    description: job.description,
+    requirements: job.requirements.join("\n"),
+    interviewers: job.interviewer_emails.join(", "),
+  });
+  const save = useMutation({
+    mutationFn: () =>
+      api.updateJob(job.id, {
+        title: form.title,
+        department: form.department || null,
+        location: form.location || null,
+        description: form.description,
+        requirements: form.requirements.split("\n").map((r) => r.trim()).filter(Boolean),
+        interviewer_emails: form.interviewers.split(/[\s,;]+/).map((e) => e.trim()).filter(Boolean),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries();
+      onClose();
+    },
+  });
+  const field = (k: keyof typeof form) => ({
+    value: form[k],
+    onChange: (e: { target: { value: string } }) => setForm({ ...form, [k]: e.target.value }),
+  });
+  return (
+    <Modal open onClose={onClose} title="Edit job">
+      <form
+        className="space-y-3"
+        onSubmit={(e) => {
+          e.preventDefault();
+          save.mutate();
+        }}
+      >
+        <div>
+          <label className="label">Title</label>
+          <input className="input" required {...field("title")} />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="label">Department</label>
+            <input className="input" {...field("department")} />
+          </div>
+          <div>
+            <label className="label">Location</label>
+            <input className="input" {...field("location")} />
+          </div>
+        </div>
+        <div>
+          <label className="label">Description</label>
+          <textarea className="input min-h-28" required {...field("description")} />
+        </div>
+        <div>
+          <label className="label">Requirements (one per line)</label>
+          <textarea className="input min-h-24" {...field("requirements")} />
+          <p className="mt-1 text-xs text-slate-500">Changes apply to new screenings; candidates already screened keep their results.</p>
+        </div>
+        <div>
+          <label className="label">Interviewers' emails (comma-separated)</label>
+          <input className="input" {...field("interviewers")} />
+        </div>
+        <ErrorNote error={save.error} />
+        <div className="flex justify-end gap-2 pt-2">
+          <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button type="submit" loading={save.isPending}>Save changes</Button>
+        </div>
+      </form>
     </Modal>
   );
 }

@@ -9,7 +9,7 @@ from ..events import log_event
 from ..models import Application, Candidate, Job, User
 from ..schemas import AddCandidate, ApplicationOut, JobIn, JobOut, JobUpdate, SourceRequest, TaskOut
 from .deps import current_user
-from .serializers import application_out
+from .serializers import LIST_LOAD, application_out
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
@@ -84,9 +84,10 @@ def delete_job(job_id: str, db: Session = Depends(get_db)):
 
 @router.get("/{job_id}/applications", response_model=list[ApplicationOut])
 def list_applications(job_id: str, db: Session = Depends(get_db)):
-    job = _get_job(db, job_id)
-    apps = sorted(job.applications, key=lambda a: (a.screening_score or -1, a.match_score or 0), reverse=True)
-    return [application_out(a) for a in apps]
+    _get_job(db, job_id)
+    apps = db.scalars(select(Application).where(Application.job_id == job_id).options(*LIST_LOAD)).all()
+    apps = sorted(apps, key=lambda a: (a.screening_score or -1, a.match_score or 0), reverse=True)
+    return [application_out(a, detail=False) for a in apps]
 
 
 @router.post("/{job_id}/source", response_model=TaskOut, status_code=202)

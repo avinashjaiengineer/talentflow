@@ -290,3 +290,18 @@ def test_relay_websocket_runs_the_conversation(client, work, twilio_settings):
         saved = db.get(Call, call.id)
         assert [t["role"] for t in saved.transcript] == ["agent", "candidate", "agent"]
         assert saved.status == CallStatus.completed  # hanging up ends the call
+
+
+def test_relay_apologizes_when_the_agent_fails(client, work, twilio_settings, monkeypatch):
+    app = _contacted(client, work)
+    call = _twilio_call(app["id"])
+    monkeypatch.setattr("app.comms.caller.next_turn", lambda *a: (_ for _ in ()).throw(RuntimeError("model down")))
+    import asyncio
+
+    real_sleep = asyncio.sleep
+    monkeypatch.setattr(asyncio, "sleep", lambda *_: real_sleep(0))  # skip the goodbye pause
+    with client.websocket_connect(f"/api/voice/relay/{call.id}?token={call.relay_token}") as ws:
+        ws.send_json({"type": "prompt", "voicePrompt": "Yes.", "last": True})
+        apology = ws.receive_json()
+        assert apology["type"] == "text" and "technical problem" in apology["token"]
+        assert ws.receive_json()["type"] == "end"

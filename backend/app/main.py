@@ -1,4 +1,5 @@
 import logging
+import threading
 import time
 import uuid
 from contextlib import asynccontextmanager
@@ -14,6 +15,7 @@ from .api import applications, auth, candidates, comms, jobs, system, voice
 from .api.deps import current_user
 from .config import get_settings
 from .db import SessionLocal, init_db
+from .embeddings import get_embedder
 from .logging_setup import configure_logging
 
 configure_logging()
@@ -27,6 +29,8 @@ async def lifespan(_: FastAPI):
         init_db()
     with SessionLocal() as db:
         auth.ensure_bootstrap_admin(db)
+    # Load the embedding model in the background so the first upload after a deploy isn't slow.
+    threading.Thread(target=get_embedder, name="warm-embedder", daemon=True).start()
     embedded = None
     if settings.run_embedded_worker:
         from .worker import start_embedded

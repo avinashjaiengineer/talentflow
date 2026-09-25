@@ -27,6 +27,7 @@ from .models import (
     Approval,
     ApprovalKind,
     ApprovalStatus,
+    CallStatus,
     Job,
     MessageKind,
     Stage,
@@ -77,6 +78,18 @@ def _move(db: Session, app: Application, to: Stage, *, actor: str, reason: str =
     )
     if to in AGENT_STAGES:
         enqueue(db, TaskKind.agent_step, application_id=app.id)
+    if to in CLOSED_STAGES:
+        _cancel_pending_calls(db, app, reason=f"candidate {to.value}")
+
+
+def _cancel_pending_calls(db: Session, app: Application, *, reason: str) -> None:
+    """Calls that haven't started yet (e.g. a reminder for tomorrow) must not go ahead."""
+    for call in app.calls:
+        if call.status in (CallStatus.scheduled, CallStatus.queued):
+            call.status = CallStatus.canceled
+            call.error = f"Canceled: {reason}"
+            log_event(db, actor="orchestrator", type="call_canceled",
+                      message=f"Canceled the {call.purpose.value} call ({reason})", application=app)
 
 
 def enqueue(db: Session, kind: TaskKind, *, application_id: str | None = None, job_id: str | None = None,
@@ -134,7 +147,7 @@ def run_agent_step(db: Session, app: Application) -> None:
     elif app.stage == Stage.scheduling:
         from . import comms
 
-        slots = comms.free_slots(job)
+        slots = comms.free_slots(db, job)
         if not slots:
             raise LLMError("No free interview slots in the next two weeks; check the interviewers' calendars")
         app.scheduling = scheduling.plan(job, candidate, slots)
@@ -209,13 +222,18 @@ def start_screening(db: Session, app: Application) -> None:
 
 
 def retry(db: Session, app: Application) -> None:
-    if app.stage not in AGENT_STAGES:
-        raise TransitionError("No agent step to retry at this stage")
+    sched = app.scheduling or {}
+    if app.stage in AGENT_STAGES:
+        kind, what = TaskKind.agent_step, "Agent step"
+    elif sched.get("confirmed_slot") and not (sched.get("meeting") or {}).get("booked_at"):
+        kind, what = TaskKind.book_meeting, "Interview booking"
+    else:
+        raise TransitionError("Nothing to retry at this stage")
     if has_open_task(db, app.id):
-        raise TransitionError("The agent is already working on this candidate")
+        raise TransitionError("TalentFlow is already working on this candidate")
     app.error = None
-    enqueue(db, TaskKind.agent_step, application_id=app.id)
-    log_event(db, actor="human", type="retry_requested", message="Agent step re-queued", application=app)
+    enqueue(db, kind, application_id=app.id)
+    log_event(db, actor="human", type="retry_requested", message=f"{what} re-queued", application=app)
     db.commit()
 
 

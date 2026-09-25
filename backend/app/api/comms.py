@@ -35,14 +35,18 @@ def edit_message(message_id: str, body: MessageUpdate, db: Session = Depends(get
 
 @router.post("/messages/{message_id}/send", response_model=MessageOut)
 def send_message(message_id: str, user: User = Depends(current_user), db: Session = Depends(get_db)):
-    msg = _get(db, Message, message_id, "Email")
+    msg = db.get(Message, message_id, with_for_update=True, populate_existing=True)  # no double sends
+    if msg is None:
+        raise HTTPException(404, "Email not found")
     _guard(comms.request_send, db, msg, by=user.name)
     return msg
 
 
 @router.post("/applications/{application_id}/calls", response_model=CallOut, status_code=201)
 def request_call(application_id: str, body: CallRequest, user: User = Depends(current_user), db: Session = Depends(get_db)):
-    app = _get(db, Application, application_id, "Application")
+    app = db.get(Application, application_id, with_for_update=True, populate_existing=True)
+    if app is None:
+        raise HTTPException(404, "Application not found")
     return _guard(comms.request_call, db, app, body.purpose, by=user.name)
 
 

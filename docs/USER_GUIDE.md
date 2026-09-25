@@ -153,7 +153,7 @@ After creating it, you land on the job's **pipeline board**.
 - **Reopen job:** allows sourcing again.
 - **Delete:** removes the job and its whole pipeline. Candidates stay in the talent pool. This can't be undone.
 
-**Job details can't be edited in the app yet** (only through the API). Get the requirements right before sourcing. Changing them later does not re-screen existing candidates.
+**Editing a job:** open **Job description & requirements → Edit** to change the title, description, requirements, or interviewers. Changed requirements apply to new screenings; candidates already screened keep their results.
 
 ## 7. Running the pipeline, end to end
 
@@ -307,7 +307,7 @@ Embeddings run locally and are free. Hosting on AWS is about $17/month (see [DEP
 - **Add user:** choose Recruiter or Admin, and give them a temporary password.
 - **Change role:** use the dropdown. You can't change your own.
 - **Deactivate:** signs the person out immediately and blocks sign-in. Their past decisions stay in the log. **Reactivate** restores access.
-- **Reset someone's password:** there's no button yet. Whoever runs the server can set a new one through the API (`PATCH /api/users/{id}` with a `password` field), which also signs that user out everywhere.
+- **Reset someone's password:** click **Reset password** next to their name and enter a temporary one. They're signed out everywhere; share the new password privately.
 
 **Server settings** live in the server's `.env` file (`deploy/.env.production` on AWS):
 
@@ -342,9 +342,9 @@ Hiring decisions affect people's lives. TalentFlow is built so that **AI assists
 - **Only Microsoft 365** is supported for email and calendar. Google Workspace isn't supported yet.
 - **No bulk actions** (approve or reject many at once).
 - **No candidate deduplication.**
-- **Jobs can't be edited in the app** after creation, and changed requirements don't re-screen existing candidates.
+- **Changed requirements don't re-screen** candidates who were already screened.
 - **A rejection is final** for that candidate and job.
-- **No password-reset button**, and no "forgot password" flow.
+- **No self-service "forgot password"**: an admin resets it from Settings.
 - **HTTP only** until an admin configures a domain.
 
 These are on the [roadmap](../README.md#roadmap).
