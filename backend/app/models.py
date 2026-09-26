@@ -81,6 +81,8 @@ class Candidate(Base):
     headline: Mapped[str | None] = mapped_column(String(300))
     skills: Mapped[list[str]] = mapped_column(JSON, default=list)
     years_experience: Mapped[float | None] = mapped_column(Float)
+    # Parsed details: links, employment_history, education, certifications, projects, years_from_dates.
+    profile: Mapped[dict | None] = mapped_column(JSON)
     resume_text: Mapped[str] = mapped_column(Text)
     resume_filename: Mapped[str | None] = mapped_column(String(300))
     do_not_call: Mapped[bool] = mapped_column(Boolean, default=False)  # set when a candidate opts out

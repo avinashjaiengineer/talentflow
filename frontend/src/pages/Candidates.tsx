@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FileText, Trash2, Upload, Users } from "lucide-react";
-import { useRef, useState } from "react";
-import { api, type Candidate } from "../api";
+import { type ReactNode, useRef, useState } from "react";
+import { api, type Candidate, type CandidateProfile } from "../api";
 import IntakePanel from "../components/IntakePanel";
 import { Badge, Button, Card, Empty, ErrorNote, Modal, PageHeader, StageBadge, cn, timeAgo } from "../components/ui";
 
@@ -189,6 +189,7 @@ function CandidateBody({ c, apps, onDelete }: { c: Candidate; apps: Awaited<Retu
       </div>
       <ContactDetails c={c} />
       <div className="flex flex-wrap gap-1">{c.skills.map((s) => <Badge key={s}>{s}</Badge>)}</div>
+      {c.profile && <ProfileDetails p={c.profile} />}
       {apps.length > 0 && (
         <div>
           <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">Pipelines</p>
@@ -206,6 +207,81 @@ function CandidateBody({ c, apps, onDelete }: { c: Candidate; apps: Awaited<Retu
         <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">Resume {c.resume_filename && `· ${c.resume_filename}`}</p>
         <pre className="max-h-96 overflow-y-auto whitespace-pre-wrap rounded-lg bg-slate-50 p-4 font-sans text-sm text-slate-700">{c.resume_text}</pre>
       </div>
+    </div>
+  );
+}
+
+function Section({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div>
+      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">{title}</p>
+      {children}
+    </div>
+  );
+}
+
+/** Only http(s) links are clickable; "linkedin.com/in/x" gets https:// added. */
+function safeHref(link: string): string | null {
+  if (/^https?:\/\//i.test(link)) return link;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(link)) return null;
+  return `https://${link}`;
+}
+
+function ProfileDetails({ p }: { p: CandidateProfile }) {
+  const period = (start: string | null, end: string | null) => (start || end ? `${start ?? "?"} – ${end ?? "?"}` : null);
+  return (
+    <div className="space-y-4">
+      {p.links.length > 0 && (
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+          {p.links.map((link) => {
+            const href = safeHref(link);
+            return href ? (
+              <a key={link} href={href} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">{link}</a>
+            ) : (
+              <span key={link} className="text-slate-500">{link}</span>
+            );
+          })}
+        </div>
+      )}
+      {p.employment_history.length > 0 && (
+        <Section title={`Work history${p.years_from_dates != null ? ` · ${p.years_from_dates} yrs from dates` : ""}`}>
+          <ol className="space-y-2 border-l-2 border-slate-200 pl-4">
+            {p.employment_history.map((job, i) => (
+              <li key={i} className="text-sm">
+                <p className="font-medium text-slate-800">
+                  {job.title}
+                  {job.company && <span className="font-normal text-slate-600"> · {job.company}</span>}
+                </p>
+                <p className="text-xs text-slate-500">{[period(job.start, job.end), job.location].filter(Boolean).join(" · ")}</p>
+                {job.summary && <p className="mt-0.5 text-slate-600">{job.summary}</p>}
+              </li>
+            ))}
+          </ol>
+        </Section>
+      )}
+      {p.education.length > 0 && (
+        <Section title="Education">
+          <ul className="space-y-1 text-sm text-slate-700">
+            {p.education.map((e, i) => (
+              <li key={i}>
+                {[e.degree, e.field].filter(Boolean).join(", ")}
+                {e.institution && <span className="text-slate-500"> · {e.institution}</span>}
+                {e.year && <span className="text-slate-500"> · {e.year}</span>}
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
+      {p.certifications.length > 0 && (
+        <Section title="Certifications">
+          <div className="flex flex-wrap gap-1">{p.certifications.map((x) => <Badge key={x} className="bg-violet-100 text-violet-700">{x}</Badge>)}</div>
+        </Section>
+      )}
+      {p.projects.length > 0 && (
+        <Section title="Projects">
+          <ul className="list-disc space-y-1 pl-5 text-sm text-slate-700">{p.projects.map((x, i) => <li key={i}>{x}</li>)}</ul>
+        </Section>
+      )}
     </div>
   );
 }

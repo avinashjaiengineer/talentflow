@@ -88,6 +88,7 @@ class CandidateUpdate(BaseModel):
 
 class CandidateDetail(CandidateOut):
     resume_text: str
+    profile: dict | None = None
 
 
 class ApprovalOut(ORM):

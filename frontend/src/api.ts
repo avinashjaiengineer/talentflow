@@ -38,6 +38,16 @@ export interface Candidate {
   do_not_call: boolean;
   created_at: string;
   resume_text?: string;
+  profile?: CandidateProfile | null;
+}
+
+export interface CandidateProfile {
+  links: string[];
+  employment_history: { title: string; company: string | null; location: string | null; start: string | null; end: string | null; summary: string | null }[];
+  education: { degree: string | null; field: string | null; institution: string | null; year: string | null }[];
+  certifications: string[];
+  projects: string[];
+  years_from_dates: number | null;
 }
 
 export interface Approval {

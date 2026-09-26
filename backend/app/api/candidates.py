@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from ..db import get_db
 from ..llm import LLMError
 from ..models import Candidate
-from ..resume import build_candidate, extract_text
+from ..resume import ResumeUnreadable, build_candidate, extract_text
 from ..schemas import ApplicationOut, CandidateDetail, CandidateIn, CandidateOut, CandidateUpdate
 from .serializers import application_out
 
@@ -19,6 +19,8 @@ def _create(db: Session, text: str, *, filename: str | None, name: str | None = 
         candidate = build_candidate(text, filename=filename, name=name, email=email)
     except LLMError as e:
         raise HTTPException(502, f"Could not parse resume: {e}") from e
+    except ResumeUnreadable as e:
+        raise HTTPException(422, str(e)) from e
     db.add(candidate)
     db.commit()
     return candidate

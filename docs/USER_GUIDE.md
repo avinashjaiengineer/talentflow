@@ -113,18 +113,20 @@ Go to **Talent pool**.
 - **Upload resumes:** click **Upload resumes** or drag files onto the dashed box. You can add several at once.
   - Supported formats: **PDF** (text-based), **DOCX**, **TXT**, and **MD**, up to 10 MB each.
   - Scanned PDFs (photos of paper) have no readable text and will be refused.
+  - Text in DOCX tables, headers, and footers is read too, so templates that put contact details or skills in a table work.
+  - Files that don't contain a resume (for example, only a cover letter) are refused with "Is this a resume?".
 - **Paste resume:** for text copied from an email or website.
 - **Job portal intake (automatic):** once an admin connects it ([INTEGRATIONS.md](INTEGRATIONS.md#job-portal-intake-resumes-from-naukri-linkedin-indeed-and-others)), applications that Naukri, LinkedIn, Indeed, and other portals email to your recruiting inbox are imported every 15 minutes, added to the job they're for, and screened. The **Job portal intake** panel at the top of the page shows what was imported, what was skipped and why, and has a **Check inbox now** button.
 
 **What happens on upload:**
-1. Claude reads the resume and extracts the name, email, phone, location, headline, skills, and years of experience.
+1. Claude reads the resume and extracts the name, email, phone, location, headline, skills, years of experience, **work history** (title, company, dates), **education**, **certifications**, **projects**, and profile links such as LinkedIn and GitHub. TalentFlow also works out total experience from the job dates, counting overlapping jobs once, and shows it next to the work history as a cross-check.
 2. The resume is turned into an *embedding* (a numerical fingerprint of its meaning) so the sourcing agent can find it later.
 
 Each file takes about 5–10 seconds, so a batch of 10 takes about a minute.
 
 **Other actions:**
 - **Search:** filter by name, title, or any word in the resume.
-- **Click a row** to see the full profile, the resume text, and every job pipeline the person is in.
+- **Click a row** to see the full profile (work history, education, certifications, projects, and links), the resume text, and every job pipeline the person is in.
 - **Delete** a candidate from their detail view. This removes them from every pipeline.
 
 **Tips:**
@@ -285,6 +287,7 @@ Pages update themselves every few seconds while agents are working. You don't ne
 | Card stuck on a spinner for more than 2 minutes | The agent is retrying (rate limit or network), or the worker is down | Open the card. "Retrying, attempt 2 of 5" means wait. If there's no message, ask an admin to check the worker. |
 | **"The agent hit an error"** with a **Retry** button | A step failed and won't retry automatically | Click **Retry**. If it fails again, note the message and tell an admin. |
 | "Could not read any text from this file" | Scanned or image-only PDF | Upload a text-based PDF or DOCX, or paste the text |
+| "No skills, work history, or experience found. Is this a resume?" | The file is a cover letter, a blank template, or not a resume | Upload the resume itself, or paste its text |
 | "Unsupported file type" | Not PDF, DOCX, TXT, or MD | Convert the file |
 | "Too many failed sign-in attempts" | 10 wrong passwords from your network | Wait 15 minutes, or ask an admin to reset your password |
 | Signed out unexpectedly | Your session expired (after 12 hours), your password was changed, or an admin deactivated your account | Sign in again |

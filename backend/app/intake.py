@@ -29,7 +29,7 @@ from .events import log_event
 from .integrations.mailbox import Attachment, GraphMailbox, get_mailbox, pick_resume
 from .llm import LLMError
 from .models import AgentTask, Candidate, IntakeItem, IntakeStatus, Job, JobStatus, TaskKind, TaskStatus
-from .resume import build_candidate, extract_text
+from .resume import ResumeUnreadable, build_candidate, extract_text
 
 log = logging.getLogger(__name__)
 
@@ -138,7 +138,11 @@ def _import(db: Session, item: Inbound, record: IntakeItem) -> None:
     is_new = False
     if candidate is None:
         filename = item.resume.filename if item.resume else None
-        parsed = build_candidate(text, filename=filename, name=item.name, email=item.email, phone=item.phone)
+        try:
+            parsed = build_candidate(text, filename=filename, name=item.name, email=item.email, phone=item.phone)
+        except ResumeUnreadable as e:
+            record.status, record.detail = IntakeStatus.skipped, str(e)
+            return
         candidate = existing_candidate(db, parsed.email)
         if candidate is None:
             db.add(parsed)

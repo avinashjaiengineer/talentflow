@@ -4,8 +4,8 @@ from sqlalchemy import select
 
 from .db import SessionLocal, init_db
 from .embeddings import embed_one
-from .models import Candidate, Job
-from .resume import parse_profile
+from .models import Job
+from .resume import build_candidate
 
 JOBS = [
     {
@@ -85,13 +85,7 @@ def seed() -> None:
             job.embedding = embed_one(f"{job.title}\n{job.description}\n{' '.join(job.requirements)}")
             db.add(job)
         for text in RESUMES:
-            p = parse_profile(text)
-            c = Candidate(
-                name=p.name, email=p.email, phone=p.phone, location=p.location, headline=p.headline,
-                skills=p.skills, years_experience=p.years_experience, resume_text=text, resume_filename=None,
-            )
-            c.embedding = embed_one(f"{c.headline or ''}\nSkills: {', '.join(c.skills)}\n{text}")
-            db.add(c)
+            db.add(build_candidate(text, filename=None))
         db.commit()
         print(f"Seeded {len(JOBS)} jobs and {len(RESUMES)} candidates.")
 
