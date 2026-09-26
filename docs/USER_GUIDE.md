@@ -25,7 +25,7 @@ How the platform works and how to use every part of it. This guide is for recrui
 
 ## 1. How TalentFlow works
 
-TalentFlow is a hiring pipeline run by **five AI agents** (powered by Claude) and supervised by **people**. The agents do the reading, writing, and organizing. People make every decision that affects a candidate.
+TalentFlow is a hiring pipeline run by **seven AI agents** (powered by Claude) and supervised by **people**. The agents do the reading, writing, and organizing. People make every decision that affects a candidate.
 
 ```
                  ┌──────────────────────────────────────────────┐
@@ -38,6 +38,8 @@ TalentFlow is a hiring pipeline run by **five AI agents** (powered by Claude) an
 
 | Agent | What it does | What you get |
 |---|---|---|
+| **Intake** | Reads applications that job portals email to your inbox (or push to the webhook), skips alerts and newsletters, and matches each to an open job | New applicants in the right pipeline, already being screened |
+| **Job writer** | Turns a few words about a role into a full job posting | A draft title, description, and requirements for you to review |
 | **Sourcing** | Reads the job, writes an "ideal candidate" profile, and searches your talent pool **by meaning**, not just keywords | A ranked list of matching candidates |
 | **Screening** | Checks the resume against **each requirement** | A score (0–100), met/partial/not-met per requirement with a quote as evidence, strengths, gaps, and a recommendation |
 | **Outreach** | Writes a short, personal first-contact email | Subject and body referencing the candidate's actual background |
@@ -112,6 +114,7 @@ Go to **Talent pool**.
   - Supported formats: **PDF** (text-based), **DOCX**, **TXT**, and **MD**, up to 10 MB each.
   - Scanned PDFs (photos of paper) have no readable text and will be refused.
 - **Paste resume:** for text copied from an email or website.
+- **Job portal intake (automatic):** once an admin connects it ([INTEGRATIONS.md](INTEGRATIONS.md#job-portal-intake-resumes-from-naukri-linkedin-indeed-and-others)), applications that Naukri, LinkedIn, Indeed, and other portals email to your recruiting inbox are imported every 15 minutes, added to the job they're for, and screened. The **Job portal intake** panel at the top of the page shows what was imported, what was skipped and why, and has a **Check inbox now** button.
 
 **What happens on upload:**
 1. Claude reads the resume and extracts the name, email, phone, location, headline, skills, and years of experience.
@@ -126,11 +129,13 @@ Each file takes about 5–10 seconds, so a batch of 10 takes about a minute.
 
 **Tips:**
 - The richer the resume, the better the screening. One-line resumes get low-confidence results.
-- Duplicate resumes aren't merged automatically. Search before uploading someone twice.
+- Applications from job portals are matched to existing candidates by email. Resumes you upload by hand aren't, so search before uploading someone twice.
 
 ## 6. Creating a job
 
 Go to **Jobs → New job**.
+
+**Let the AI write it:** type a few words in **Describe the role in a few words** (for example, `Senior Python developer, 5 yrs, fintech, Bangalore`) and click **Write with AI**. The job-writer agent fills in the title, department, location, description, and requirements. It doesn't invent salary or benefits. Always review the draft, especially the requirements, since screening scores against them.
 
 | Field | Tips |
 |---|---|
@@ -341,7 +346,7 @@ Hiring decisions affect people's lives. TalentFlow is built so that **AI assists
 - **Email replies are logged by hand** ("Candidate replied"). TalentFlow doesn't read the inbox yet.
 - **Only Microsoft 365** is supported for email and calendar. Google Workspace isn't supported yet.
 - **No bulk actions** (approve or reject many at once).
-- **No candidate deduplication.**
+- **Only job-portal applications are deduplicated** (by email). Uploads by hand aren't.
 - **Changed requirements don't re-screen** candidates who were already screened.
 - **A rejection is final** for that candidate and job.
 - **No self-service "forgot password"**: an admin resets it from Settings.

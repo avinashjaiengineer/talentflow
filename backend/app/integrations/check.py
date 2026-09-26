@@ -22,9 +22,10 @@ class Check:
 
 def check_microsoft(settings: Settings, transport: httpx.BaseTransport | None = None) -> list[Check]:
     area = "Microsoft 365"
-    uses = [x for x, v in (("email", settings.email_provider), ("calendar", settings.calendar_provider)) if v == "graph"]
+    uses = [x for x, v in (("email", settings.email_provider), ("calendar", settings.calendar_provider),
+                           ("resume intake", settings.intake_provider)) if v == "graph"]
     if not uses:
-        return [Check(area, "Enabled", None, "Not enabled (EMAIL_PROVIDER / CALENDAR_PROVIDER aren't 'graph')")]
+        return [Check(area, "Enabled", None, "Not enabled (EMAIL_PROVIDER / CALENDAR_PROVIDER / INTAKE_PROVIDER aren't 'graph')")]
     from .graph import GraphClient
 
     try:
@@ -39,20 +40,30 @@ def check_microsoft(settings: Settings, transport: httpx.BaseTransport | None = 
         hint = " Check MS_TENANT_ID, MS_CLIENT_ID, and that MS_CLIENT_SECRET hasn't expired."
         return [*checks, Check(area, "Sign-in", False, str(e) + hint)]
 
-    # Free/busy for the sender mailbox proves Calendars permission and mailbox scope, without writing anything.
-    start = datetime.now(UTC).replace(microsecond=0) + timedelta(days=1)
-    try:
-        client.request(
-            "POST", f"/users/{settings.ms_sender}/calendar/getSchedule",
-            json={"schedules": [settings.ms_sender],
-                  "startTime": {"dateTime": start.replace(tzinfo=None).isoformat(), "timeZone": "UTC"},
-                  "endTime": {"dateTime": (start + timedelta(hours=1)).replace(tzinfo=None).isoformat(), "timeZone": "UTC"}},
-        )
-        checks.append(Check(area, "Calendar access", True, f"Can read {settings.ms_sender}'s free/busy"))
-    except IntegrationError as e:
-        hint = (" The app needs Calendars.ReadWrite, and with RBAC for Applications the mailbox must be in the"
-                " 'TalentFlow Mailboxes' scope (changes can take up to 2 hours).")
-        checks.append(Check(area, "Calendar access", False, str(e) + hint))
+    if {"email", "calendar"} & set(uses):
+        # Free/busy for the sender mailbox proves Calendars permission and mailbox scope, without writing anything.
+        start = datetime.now(UTC).replace(microsecond=0) + timedelta(days=1)
+        try:
+            client.request(
+                "POST", f"/users/{settings.ms_sender}/calendar/getSchedule",
+                json={"schedules": [settings.ms_sender],
+                      "startTime": {"dateTime": start.replace(tzinfo=None).isoformat(), "timeZone": "UTC"},
+                      "endTime": {"dateTime": (start + timedelta(hours=1)).replace(tzinfo=None).isoformat(), "timeZone": "UTC"}},
+            )
+            checks.append(Check(area, "Calendar access", True, f"Can read {settings.ms_sender}'s free/busy"))
+        except IntegrationError as e:
+            hint = (" The app needs Calendars.ReadWrite, and with RBAC for Applications the mailbox must be in the"
+                    " 'TalentFlow Mailboxes' scope (changes can take up to 2 hours).")
+            checks.append(Check(area, "Calendar access", False, str(e) + hint))
+    if "resume intake" in uses:
+        mailbox = settings.intake_mailbox_address
+        try:
+            client.request("GET", f"/users/{mailbox}/mailFolders/{settings.intake_folder}/messages?$top=1&$select=id")
+            checks.append(Check(area, "Resume intake mailbox", True, f"Can read {mailbox}/{settings.intake_folder}"))
+        except IntegrationError as e:
+            hint = (" The app needs Mail.Read on this mailbox (add it to the 'TalentFlow Mailboxes' scope), and"
+                    " INTAKE_FOLDER must be a well-known folder name like 'inbox' or a folder id.")
+            checks.append(Check(area, "Resume intake mailbox", False, str(e) + hint))
     if "email" in uses:
         checks.append(Check(area, "Email sending", None,
                             "Can't be checked without sending. Use 'Send test email to me' to confirm Mail.Send."))

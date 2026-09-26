@@ -2,7 +2,7 @@
 
 **An open-source, multi-agent recruiting pipeline powered by Claude.**
 
-Five specialist AI agents source, screen, contact, schedule, and evaluate candidates. An orchestrator moves each candidate through the pipeline, and a person makes every decision that matters: nobody advances past screening or gets an offer without a human approving it.
+Seven specialist AI agents pick up applications from job portals, write job descriptions, and source, screen, contact, schedule, and evaluate candidates. An orchestrator moves each candidate through the pipeline, and a person makes every decision that matters: nobody advances past screening or gets an offer without a human approving it.
 
 ![Pipeline board: candidates sourced and screened by Claude, ranked by fit](docs/screenshots/pipeline-board.jpg)
 
@@ -38,6 +38,8 @@ _All screenshots show demo data from `python -m app.seed`, screened by Claude Op
 
 ## Features
 
+- **Job portal intake.** Applications that Naukri, LinkedIn, Indeed, and other portals email to your recruiting inbox are imported automatically. The intake agent skips alerts and newsletters, parses the resume, recognizes returning applicants by email, adds each one to the right job, and starts screening. Careers pages and tools like Zapier can also push applications to a webhook. See [integrations](docs/INTEGRATIONS.md#job-portal-intake-resumes-from-naukri-linkedin-indeed-and-others).
+- **AI job descriptions.** Type a few words, like "senior Python dev, 5 yrs, fintech, Bangalore", and the job-writer agent drafts the title, description, and screenable requirements for you to review.
 - **Semantic sourcing.** Resumes and jobs are embedded with pgvector, so "built RAG pipelines" matches a job asking for "LLM applications" even with zero shared keywords.
 - **Evidence-based screening.** Each requirement is marked met, partial, or not met, with a quote from the resume. The agent is instructed to ignore protected characteristics.
 - **Personalized outreach.** Emails reference what actually makes the candidate a fit. Recruiters edit them and click **Send**, and they go out from **Outlook**.
@@ -94,6 +96,8 @@ npm run dev
 
 | Agent | Does | Output |
 |---|---|---|
+| **Intake** | Reads applications emailed by job portals (or pushed to the webhook), skips non-applications, and matches each one to an open job | Candidates added to the right pipeline |
+| **Job writer** | Expands a recruiter's few-word brief into a full job posting | Title, description, requirements (a draft to review) |
 | **Sourcing** | Writes an "ideal candidate" profile for the job, embeds it, and runs a vector search over the talent pool | Ranked matches |
 | **Screening** | Scores the resume against each requirement | Score 0–100, met/partial/not-met with evidence, recommendation |
 | **Outreach** | Drafts a personalized first-contact email | Subject and body |
@@ -164,10 +168,14 @@ Interactive docs are at `http://localhost:8000/docs` in development. Every endpo
 
 ```
 POST /api/auth/login                    sign in
+POST /api/jobs/draft                    job-writer agent: a few words → draft job posting
 POST /api/jobs                          create a job
 POST /api/jobs/{id}/source              queue the sourcing agent (auto-screens matches) → task
 GET  /api/tasks/{id}                    poll a queued agent task
 POST /api/candidates/upload             upload a PDF/DOCX/TXT resume
+POST /api/intake/check                  queue a job-portal mailbox check → task
+GET  /api/intake/items                  applications picked up from job portals
+POST /api/intake/webhook                push an application (X-Intake-Token; public)
 GET  /api/approvals?status=pending      the human review queue
 POST /api/approvals/{id}/decide         approve or reject
 POST /api/applications/{id}/replied     candidate replied → scheduling agent

@@ -163,7 +163,7 @@ export interface Health {
   models: Record<string, string>;
   embeddings: string;
   database: string;
-  integrations: { email: "outbox" | "graph"; calendar: "local" | "graph"; voice: "simulated" | "twilio" };
+  integrations: { email: "outbox" | "graph"; calendar: "local" | "graph"; voice: "simulated" | "twilio"; intake: "off" | "graph" };
 }
 
 export interface Stats {
@@ -186,13 +186,48 @@ export interface User {
 
 export interface Task {
   id: number;
-  kind: "agent_step" | "source";
+  kind: "agent_step" | "source" | "intake";
   status: "queued" | "running" | "succeeded" | "failed";
   application_id: string | null;
   job_id: string | null;
-  result: { application_ids: string[]; count: number } | null;
+  result: { application_ids?: string[]; count: number } | null;
   attempts: number;
   last_error: string | null;
+}
+
+export interface JobDraft {
+  title: string;
+  department: string | null;
+  location: string | null;
+  description: string;
+  requirements: string[];
+}
+
+export interface IntakeItem {
+  id: string;
+  source: "mailbox" | "webhook";
+  portal: string | null;
+  subject: string | null;
+  sender: string | null;
+  status: "imported" | "duplicate" | "skipped" | "failed";
+  detail: string | null;
+  candidate_id: string | null;
+  job_id: string | null;
+  application_id: string | null;
+  received_at: string | null;
+  created_at: string;
+  candidate_name: string | null;
+  job_title: string | null;
+}
+
+export interface IntakeStatus {
+  mailbox_enabled: boolean;
+  mailbox: string | null;
+  poll_minutes: number;
+  webhook_enabled: boolean;
+  auto_screen: boolean;
+  last_checked: string | null;
+  checking: boolean;
 }
 
 export interface IntegrationCheck {
@@ -260,6 +295,7 @@ export const api = {
   createJob: (body: Pick<Job, "title" | "department" | "location" | "description" | "requirements" | "interviewer_emails">) =>
     request<Job>("/jobs", json("POST", body)),
   updateJob: (id: string, body: Partial<Job>) => request<Job>(`/jobs/${id}`, json("PATCH", body)),
+  draftJob: (brief: string) => request<JobDraft>("/jobs/draft", json("POST", { brief })),
   deleteJob: (id: string) => request<void>(`/jobs/${id}`, { method: "DELETE" }),
   jobApplications: (id: string) => request<Application[]>(`/jobs/${id}/applications`),
   source: (id: string, limit: number) => request<Task>(`/jobs/${id}/source`, json("POST", { limit, auto_screen: true })),
@@ -286,6 +322,10 @@ export const api = {
   simulateReply: (id: string, text: string) => request<Call>(`/calls/${id}/simulate`, json("POST", { text })),
   hangUp: (id: string) => request<Call>(`/calls/${id}/hang-up`, json("POST")),
   deleteCandidate: (id: string) => request<void>(`/candidates/${id}`, { method: "DELETE" }),
+
+  intakeStatus: () => request<IntakeStatus>("/intake/status"),
+  intakeItems: (limit = 50) => request<IntakeItem[]>(`/intake/items?limit=${limit}`),
+  checkIntake: () => request<Task>("/intake/check", json("POST")),
 
   application: (id: string) => request<Application>(`/applications/${id}`),
   screen: (id: string) => request<Application>(`/applications/${id}/screen`, json("POST")),

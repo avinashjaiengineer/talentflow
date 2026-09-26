@@ -3,11 +3,13 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from .. import orchestrator
+from ..agents import job_writer
 from ..db import get_db
 from ..embeddings import embed_one
 from ..events import log_event
+from ..llm import LLMError
 from ..models import Application, Candidate, Job, User
-from ..schemas import AddCandidate, ApplicationOut, JobIn, JobOut, JobUpdate, SourceRequest, TaskOut
+from ..schemas import AddCandidate, ApplicationOut, JobBrief, JobIn, JobOut, JobUpdate, SourceRequest, TaskOut
 from .deps import current_user
 from .serializers import LIST_LOAD, application_out
 
@@ -57,6 +59,16 @@ def create_job(body: JobIn, user: User = Depends(current_user), db: Session = De
     log_event(db, actor="human", type="job_created", message=f"{user.name} opened {job.title}", job_id=job.id)
     db.commit()
     return _with_counts(db, [job])[0]
+
+
+@router.post("/draft", response_model=job_writer.JobDraft)
+def draft_job(body: JobBrief):
+    """Job-writer agent: expand a few words into a full job posting. Nothing is saved;
+    the recruiter reviews the draft and creates the job with POST /api/jobs."""
+    try:
+        return job_writer.draft(body.brief)
+    except LLMError as e:
+        raise HTTPException(502, f"Couldn't write the job description: {e}") from e
 
 
 @router.get("/{job_id}", response_model=JobOut)

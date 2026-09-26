@@ -216,6 +216,21 @@ def add_to_pipeline(db: Session, job: Job, candidate_id: str, *, by: str, auto_s
     return app
 
 
+def add_applicant(db: Session, job: Job, candidate, *, actor: str, note: str, auto_screen: bool) -> Application:
+    """Add a candidate who applied through a job portal. Committed by the caller."""
+    db.flush()
+    existing = db.scalar(select(Application).where(Application.job_id == job.id, Application.candidate_id == candidate.id))
+    if existing:
+        return existing
+    app = Application(job=job, candidate=candidate)
+    db.add(app)
+    db.flush()
+    log_event(db, actor=actor, type="applied", message=note, application=app)
+    if auto_screen:
+        _move(db, app, Stage.screening, actor="orchestrator")
+    return app
+
+
 def start_screening(db: Session, app: Application) -> None:
     _move(db, app, Stage.screening, actor="orchestrator")
     db.commit()

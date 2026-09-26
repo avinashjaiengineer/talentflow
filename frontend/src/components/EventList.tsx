@@ -1,8 +1,10 @@
-import { Bot, CalendarClock, ClipboardCheck, Mail, Search, User, Workflow } from "lucide-react";
+import { Bot, CalendarClock, ClipboardCheck, Inbox, Mail, PenLine, Search, User, Workflow } from "lucide-react";
 import type { Event } from "../api";
 import { cn, timeAgo } from "./ui";
 
 const ACTORS: Record<string, { icon: typeof Bot; className: string }> = {
+  intake: { icon: Inbox, className: "bg-teal-100 text-teal-700" },
+  job_writer: { icon: PenLine, className: "bg-teal-100 text-teal-700" },
   sourcing: { icon: Search, className: "bg-teal-100 text-teal-700" },
   screening: { icon: ClipboardCheck, className: "bg-teal-100 text-teal-700" },
   outreach: { icon: Mail, className: "bg-teal-100 text-teal-700" },

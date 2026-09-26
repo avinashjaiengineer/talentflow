@@ -1,12 +1,13 @@
 # Email, calendar, Teams, and AI calls
 
-TalentFlow can email candidates from Outlook, book interviews in Outlook with a Teams link, and phone candidates with an AI calling agent. Every integration is **off by default**: out of the box everything works inside TalentFlow, and nothing reaches a candidate until you connect a provider.
+TalentFlow can email candidates from Outlook, book interviews in Outlook with a Teams link, phone candidates with an AI calling agent, and pick up applications from job portals. Every integration is **off by default**: out of the box everything works inside TalentFlow, and nothing reaches a candidate until you connect a provider.
 
 | Feature | Default (nothing leaves TalentFlow) | Connected |
 |---|---|---|
 | **Email** | "Send" records the email in TalentFlow; you send it yourself | Sent from your Outlook mailbox (Microsoft 365) |
 | **Calendar** | Slots are proposed in working hours; bookings are recorded only | Slots avoid interviewers' busy times; the interview is booked in Outlook with a **Teams link**, and invitations go out automatically |
 | **Calls** | **Simulated**: you type the candidate's replies and the AI answers exactly as it would on a real call | Real phone calls through **Twilio** |
+| **Job portal intake** | Upload resumes by hand | Applications emailed by Naukri, LinkedIn, Indeed, and others are imported and screened automatically; tools can also push them to a webhook |
 
 People stay in control: an agent drafts every email and prepares every call, but **nothing is sent or dialed until a recruiter clicks Send or Call**.
 
@@ -111,6 +112,72 @@ When creating a job, list the **interviewers' emails**. TalentFlow then proposes
 
 ---
 
+## Job portal intake: resumes from Naukri, LinkedIn, Indeed, and others
+
+The **intake agent** picks up applications automatically, so nobody has to download resumes from each portal and upload them by hand. There are two ways in, and you can use both.
+
+**Why email and a webhook, not a portal login?** Resume-database APIs (such as Naukri Resdex or LinkedIn Recruiter) are only available to paid partners, and logging in to a portal to scrape it breaks their terms of service. Every major portal can **email each application with the resume attached**, so TalentFlow reads those emails.
+
+### What the intake agent does with each application
+1. **Decides whether it's an application.** Job alerts, newsletters, invoices, and portal account notices are skipped.
+2. **Works out the portal** from the sender (for example `naukri.com` → Naukri) and **which open job** the application is for. If no open job clearly fits, the candidate waits in the talent pool for a recruiter to assign.
+3. **Parses the resume** (PDF, DOCX, or TXT attachment) into a candidate.
+4. **Matches returning applicants by email**, so one person applying twice, or through two portals, is still one candidate.
+5. **Adds them to the job's pipeline** and starts **screening**, exactly like a sourced candidate. The approval gate still applies.
+
+Each email is processed **once**. TalentFlow only reads the mailbox: it never marks, moves, or deletes email. Results appear in **Talent pool → Job portal intake**, and in the activity log.
+
+### Option 1: an Outlook mailbox (recommended)
+1. **Choose a mailbox for applications**, ideally a dedicated one such as `jobs@yourcompany.com`. The recruiting mailbox (`MS_SENDER`) also works.
+2. **Point each portal at it.** In each portal's job posting or employer settings, set this address as the one that receives applications. If applications already arrive somewhere else, add an Outlook rule there to forward them.
+3. **Grant `Mail.Read`** on that mailbox. It's read-only. With RBAC for Applications (Option A above), add the mailbox to the `TalentFlow Mailboxes` group and run:
+   ```powershell
+   New-ManagementRoleAssignment -App <enterprise-app-object-id> -Role "Application Mail.Read" -CustomResourceScope "TalentFlow Mailboxes"
+   ```
+4. **Configure TalentFlow** (this uses the same Microsoft 365 app registration as email and calendar):
+   ```bash
+   INTAKE_PROVIDER=graph
+   INTAKE_MAILBOX=jobs@yourcompany.com   # defaults to MS_SENDER
+   INTAKE_FOLDER=inbox                   # a well-known folder name or a folder id
+   INTAKE_POLL_MINUTES=15                # 0 = only when someone clicks "Check inbox now"
+   INTAKE_LOOKBACK_DAYS=7                # how far back the first check reads
+   INTAKE_AUTO_SCREEN=true               # screen applicants as soon as they're matched to a job
+   ```
+5. Restart. Then, in **Settings → Integrations → Run checks**, "Resume intake mailbox" should pass. Click **Check inbox now** on the Talent pool page to run a check immediately.
+
+### Option 2: the webhook
+Use the webhook for your careers page, portals with an API, or automation tools (Zapier, Make, n8n) that can push an application. Set a long random token:
+
+```bash
+INTAKE_WEBHOOK_TOKEN=<openssl rand -hex 32>
+```
+
+Then `POST /api/intake/webhook` with the header `X-Intake-Token: <token>` (or `Authorization: Bearer <token>`):
+
+```bash
+curl -X POST https://talent.yourcompany.com/api/intake/webhook \
+  -H "X-Intake-Token: $TOKEN" -H "Content-Type: application/json" \
+  -d '{"external_id": "naukri-48213", "portal": "Naukri", "job_title": "Senior Backend Engineer",
+       "resume_base64": "'"$(base64 -w0 resume.pdf)"'", "filename": "resume.pdf"}'
+```
+
+| Field | |
+|---|---|
+| `resume_text`, or `resume_base64` + `filename` | Required. PDF, DOCX, or TXT, up to 10 MB |
+| `job_id` or `job_title` | Optional. Without either, the candidate goes to the talent pool unassigned |
+| `external_id` | Optional. Sending the same id again returns the first result, so retries are safe. Defaults to a hash of the email address and resume |
+| `portal`, `name`, `email`, `phone` | Optional. The resume's own details are used for anything missing |
+
+The response is the intake item, with its `status` (`imported`, `duplicate`, `skipped`, or `failed`) and the candidate and job it was linked to. A `503` means the resume couldn't be parsed right now (for example, a rate limit), so retry later.
+
+### Cost
+Each application costs one short classification (only for email) plus one resume parse. You can run both on a cheaper model:
+```bash
+MODEL_INTAKE=claude-haiku-4-5
+```
+
+---
+
 ## Twilio: real AI phone calls
 
 You need a Twilio account, a phone number that can call your candidates' countries, **HTTPS** for TalentFlow (a domain; see [DEPLOYMENT.md](DEPLOYMENT.md#https)), and an Anthropic API key.
@@ -154,7 +221,7 @@ Resumes often include a phone number, which is extracted automatically. Otherwis
 After setting the variables and redeploying, sign in as an admin and open **Settings → Integrations**:
 
 - **Run checks** tests everything that can be checked **without contacting anyone**:
-  - **Microsoft 365:** signing in to Entra ID, and reading the sender mailbox's free/busy (this confirms the calendar permission and the mailbox scope).
+  - **Microsoft 365:** signing in to Entra ID, reading the sender mailbox's free/busy (this confirms the calendar permission and the mailbox scope), and, when intake is on, reading the intake mailbox.
   - **Twilio:** that the account is active (and warns if it's a trial), that the phone number belongs to the account and can make voice calls, and that `PUBLIC_BASE_URL` is reachable over HTTPS.
 - **Send test email to me** sends one email to your own address through Outlook. It's the only way to confirm `Mail.Send`.
 

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Briefcase, MapPin, Plus } from "lucide-react";
+import { Briefcase, MapPin, Plus, Sparkles } from "lucide-react";
 import { type ChangeEvent, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api";
@@ -76,6 +76,19 @@ function JobForm({ open, onClose }: { open: boolean; onClose: () => void }) {
       navigate(`/jobs/${job.id}`);
     },
   });
+  const [brief, setBrief] = useState("");
+  const write = useMutation({
+    mutationFn: () => api.draftJob(brief.trim()),
+    onSuccess: (d) =>
+      setForm((f) => ({
+        ...f,
+        title: d.title,
+        department: d.department ?? f.department,
+        location: d.location ?? f.location,
+        description: d.description,
+        requirements: d.requirements.join("\n"),
+      })),
+  });
   const set = (k: keyof typeof form) => (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setForm({ ...form, [k]: e.target.value });
 
   return (
@@ -87,6 +100,32 @@ function JobForm({ open, onClose }: { open: boolean; onClose: () => void }) {
           create.mutate();
         }}
       >
+        <div className="rounded-lg border border-indigo-100 bg-indigo-50/60 p-3">
+          <label className="label">Describe the role in a few words</label>
+          <div className="flex gap-2">
+            <input
+              className="input"
+              value={brief}
+              onChange={(e) => setBrief(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  if (brief.trim().length >= 3) write.mutate();
+                }
+              }}
+              placeholder="Senior Python developer, 5 yrs, fintech, Bangalore"
+            />
+            <Button type="button" variant="secondary" className="shrink-0" onClick={() => write.mutate()} loading={write.isPending} disabled={brief.trim().length < 3}>
+              {!write.isPending && <Sparkles className="size-4" />} Write with AI
+            </Button>
+          </div>
+          <p className="mt-1 text-xs text-slate-500">
+            {write.isSuccess
+              ? "Draft filled in below. Review and edit it before creating the job."
+              : "The job-writer agent drafts the title, description, and requirements for you to review."}
+          </p>
+          <ErrorNote error={write.error} />
+        </div>
         <div>
           <label className="label">Title</label>
           <input className="input" required value={form.title} onChange={set("title")} placeholder="Senior Backend Engineer" />

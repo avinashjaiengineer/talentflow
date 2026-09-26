@@ -178,6 +178,7 @@ class TaskKind(str, enum.Enum):
     book_meeting = "book_meeting"
     place_call = "place_call"
     summarize_call = "summarize_call"
+    intake = "intake"  # check the job-portal mailbox for new applications
 
 
 class TaskStatus(str, enum.Enum):
@@ -287,3 +288,35 @@ class Call(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
 
     application: Mapped[Application] = relationship(back_populates="calls")
+
+
+class IntakeStatus(str, enum.Enum):
+    imported = "imported"  # new candidate added to the talent pool
+    duplicate = "duplicate"  # candidate was already in the pool; linked to the job only
+    skipped = "skipped"  # not an application, or no readable resume
+    failed = "failed"
+
+
+class IntakeItem(Base):
+    """One application received from a job portal, by email or webhook. The unique
+    (source, external_id) pair makes intake idempotent: an email is processed once."""
+
+    __tablename__ = "intake_items"
+    __table_args__ = (UniqueConstraint("source", "external_id"),)
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
+    source: Mapped[str] = mapped_column(String(30))  # "mailbox" | "webhook"
+    external_id: Mapped[str] = mapped_column(String(500))
+    portal: Mapped[str | None] = mapped_column(String(60))  # e.g. Naukri, LinkedIn, Indeed
+    subject: Mapped[str | None] = mapped_column(String(500))
+    sender: Mapped[str | None] = mapped_column(String(320))
+    status: Mapped[IntakeStatus] = mapped_column(Enum(IntakeStatus), index=True)
+    detail: Mapped[str | None] = mapped_column(Text)
+    candidate_id: Mapped[str | None] = mapped_column(ForeignKey("candidates.id", ondelete="SET NULL"))
+    job_id: Mapped[str | None] = mapped_column(ForeignKey("jobs.id", ondelete="SET NULL"))
+    application_id: Mapped[str | None] = mapped_column(ForeignKey("applications.id", ondelete="SET NULL"))
+    received_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)
+
+    candidate: Mapped[Candidate | None] = relationship()
+    job: Mapped[Job | None] = relationship()

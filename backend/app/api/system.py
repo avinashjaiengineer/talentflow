@@ -17,7 +17,7 @@ from .deps import require_admin
 public_router = APIRouter(tags=["system"])
 router = APIRouter(tags=["system"])
 
-AGENTS = ("sourcing", "screening", "outreach", "scheduling", "evaluation")
+AGENTS = ("intake", "job_writer", "sourcing", "screening", "outreach", "scheduling", "evaluation")
 
 
 @public_router.get("/health")
@@ -39,7 +39,8 @@ def system_info():
         models={} if mock else {a: s.model_for(a) for a in AGENTS},
         embeddings=type(get_embedder()).__name__.removesuffix("Embedder").lower(),
         database=engine.dialect.name,
-        integrations={"email": s.email_provider, "calendar": s.calendar_provider, "voice": s.voice_provider},
+        integrations={"email": s.email_provider, "calendar": s.calendar_provider, "voice": s.voice_provider,
+                      "intake": s.intake_provider},
     )
 
 

@@ -5,7 +5,9 @@ import re
 
 from pydantic import BaseModel, Field
 
+from .embeddings import embed_one
 from .llm import run_structured
+from .models import Candidate
 
 
 def extract_text(filename: str, data: bytes) -> str:
@@ -80,3 +82,23 @@ def parse_profile(text: str) -> CandidateProfile:
         schema=CandidateProfile,
         heuristic=lambda: _heuristic_profile(text),
     )
+
+
+def build_candidate(
+    text: str, *, filename: str | None, name: str | None = None, email: str | None = None, phone: str | None = None
+) -> Candidate:
+    """Parse and embed a resume into a new, unsaved Candidate. Raises LLMError if parsing fails."""
+    profile = parse_profile(text)
+    candidate = Candidate(
+        name=name or profile.name,
+        email=email or profile.email,
+        phone=phone or profile.phone,
+        location=profile.location,
+        headline=profile.headline,
+        skills=profile.skills,
+        years_experience=profile.years_experience,
+        resume_text=text,
+        resume_filename=filename,
+    )
+    candidate.embedding = embed_one(f"{candidate.headline or ''}\nSkills: {', '.join(candidate.skills)}\n{text}")
+    return candidate

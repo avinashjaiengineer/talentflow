@@ -17,7 +17,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import select, update
 from sqlalchemy.exc import OperationalError
 
-from . import comms, orchestrator
+from . import comms, intake, orchestrator
 from .config import get_settings
 from .db import SessionLocal
 from .events import log_event
@@ -80,6 +80,8 @@ def execute(task_id: int) -> None:
                 job = db.get(Job, task.job_id)
                 if job is not None:
                     task.result = orchestrator.run_sourcing(db, job, **(task.payload or {}))
+            elif task.kind == TaskKind.intake:
+                task.result = intake.poll_mailbox(db)
             else:
                 comms.run_task(db, task.kind, task.application_id, task.payload or {})
             task.status = TaskStatus.succeeded
@@ -142,6 +144,8 @@ def run_forever(stop_event: threading.Event | None = None) -> None:
         try:
             if time.monotonic() - last_sweep > 60:
                 requeue_stale()
+                with SessionLocal() as db:
+                    intake.schedule_if_due(db)
                 last_sweep = time.monotonic()
             task_id = claim()
             if task_id is None:

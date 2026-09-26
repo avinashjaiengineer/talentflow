@@ -1,4 +1,4 @@
-"""The five specialist agents. Each one is a focused Claude call with a typed output;
+"""The specialist agents. Each one is a focused Claude call with a typed output;
 the orchestrator decides when each runs and persists the results."""
 
 FAIRNESS = """Evaluate only job-relevant qualifications: skills, experience, and demonstrated results.

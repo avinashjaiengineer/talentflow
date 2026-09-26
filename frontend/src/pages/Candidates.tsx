@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FileText, Trash2, Upload, Users } from "lucide-react";
 import { useRef, useState } from "react";
 import { api, type Candidate } from "../api";
+import IntakePanel from "../components/IntakePanel";
 import { Badge, Button, Card, Empty, ErrorNote, Modal, PageHeader, StageBadge, cn, timeAgo } from "../components/ui";
 
 type UploadState = { name: string; status: "uploading" | "done" | "error"; message?: string };
@@ -44,6 +45,7 @@ export default function CandidatesPage() {
           </>
         }
       />
+      <IntakePanel />
       <input
         ref={fileInput}
         type="file"

@@ -41,6 +41,8 @@ class Settings(BaseSettings):
     model_outreach: str | None = None
     model_scheduling: str | None = None
     model_evaluation: str | None = None
+    model_intake: str | None = None
+    model_job_writer: str | None = None
     llm_effort: Literal["low", "medium", "high", "xhigh", "max"] = "high"
 
     # Embeddings: fastembed runs locally (no key); voyage is hosted; hash is a
@@ -113,6 +115,22 @@ class Settings(BaseSettings):
     model_caller: str | None = None  # live calls need fast replies; e.g. claude-haiku-4-5
     call_max_turns: int = 24
     reminder_hours_before: int = 24
+
+    # Resume intake from job portals. Naukri, LinkedIn, Indeed, and most other portals email
+    # each application (with the resume attached) to the recruiter. "graph" reads those
+    # emails from an Outlook mailbox; "off" disables mailbox checks. The webhook, for
+    # portals and automation tools that can push applications, is enabled by its token.
+    intake_provider: Literal["off", "graph"] = "off"
+    intake_mailbox: str | None = None  # defaults to MS_SENDER
+    intake_folder: str = "inbox"
+    intake_poll_minutes: int = 15  # 0 = only when someone clicks "Check inbox now"
+    intake_lookback_days: int = 7
+    intake_webhook_token: str | None = None  # enables POST /api/intake/webhook
+    intake_auto_screen: bool = True  # screen applicants as soon as they're matched to a job
+
+    @property
+    def intake_mailbox_address(self) -> str | None:
+        return self.intake_mailbox or self.ms_sender
 
     def model_for(self, agent: str) -> str:
         return getattr(self, f"model_{agent}", None) or self.default_model

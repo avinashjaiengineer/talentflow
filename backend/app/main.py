@@ -11,7 +11,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 
 from . import __version__
-from .api import applications, auth, candidates, comms, jobs, system, voice
+from .api import applications, auth, candidates, comms, intake, jobs, system, voice
 from .api.deps import current_user
 from .config import get_settings
 from .db import SessionLocal, init_db
@@ -98,7 +98,8 @@ async def request_context(request: Request, call_next):
 app.include_router(system.public_router, prefix="/api")
 app.include_router(auth.router, prefix="/api")
 app.include_router(voice.router, prefix="/api")  # Twilio: signature- and token-authenticated
-for module in (system, jobs, candidates, applications, comms):
+app.include_router(intake.public_router, prefix="/api")  # job portals: token-authenticated
+for module in (system, jobs, candidates, applications, comms, intake):
     app.include_router(module.router, prefix="/api", dependencies=[Depends(current_user)])
 
 # Serve the built frontend when it is present (single-container deployments).
