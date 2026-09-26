@@ -5,6 +5,8 @@ import tempfile
 # database with hash embeddings. Set TEST_DATABASE_URL to run the suite against Postgres.
 _tmp = tempfile.mkdtemp()
 os.environ["DATABASE_URL"] = os.environ.get("TEST_DATABASE_URL", f"sqlite:///{_tmp}/test.db")
+os.environ["STORAGE_PROVIDER"] = "local"
+os.environ["STORAGE_DIR"] = f"{_tmp}/files"
 os.environ["LLM_PROVIDER"] = "mock"
 os.environ["EMBEDDING_PROVIDER"] = os.environ.get("TEST_EMBEDDING_PROVIDER", "hash")
 os.environ["EMBEDDED_WORKER"] = "false"  # tests drive the worker explicitly

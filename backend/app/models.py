@@ -85,11 +85,35 @@ class Candidate(Base):
     profile: Mapped[dict | None] = mapped_column(JSON)
     resume_text: Mapped[str] = mapped_column(Text)
     resume_filename: Mapped[str | None] = mapped_column(String(300))
+    resume_file_key: Mapped[str | None] = mapped_column(String(500))  # the original file in storage.py
     do_not_call: Mapped[bool] = mapped_column(Boolean, default=False)  # set when a candidate opts out
     embedding: Mapped[list[float] | None] = mapped_column(EmbeddingType(EMBEDDING_DIM))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     applications: Mapped[list["Application"]] = relationship(back_populates="candidate", cascade="all, delete-orphan")
+    chunks: Mapped[list["ResumeChunk"]] = relationship(
+        back_populates="candidate", cascade="all, delete-orphan", order_by="ResumeChunk.position"
+    )
+
+    @property
+    def has_original_file(self) -> bool:
+        return self.resume_file_key is not None
+
+
+class ResumeChunk(Base):
+    """One searchable piece of a resume: the profile summary, a section, or a single job."""
+
+    __tablename__ = "resume_chunks"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    candidate_id: Mapped[str] = mapped_column(ForeignKey("candidates.id", ondelete="CASCADE"), index=True)
+    kind: Mapped[str] = mapped_column(String(30))  # profile | summary | experience | skills | education | ...
+    position: Mapped[int] = mapped_column(Integer)
+    text: Mapped[str] = mapped_column(Text)
+    model: Mapped[str] = mapped_column(String(200))  # embeddings.model_id() that produced the vector
+    embedding: Mapped[list[float] | None] = mapped_column(EmbeddingType(EMBEDDING_DIM))
+
+    candidate: Mapped["Candidate"] = relationship(back_populates="chunks")
 
 
 class Application(Base):

@@ -57,6 +57,14 @@ The file is gitignored. It is copied to the server with `0600` permissions.
 
 This uploads the working tree, builds the image on the server, and starts the containers. It runs `alembic upgrade head` before the API starts and waits for `/api/ready`. Re-run it to ship changes; builds after the first one are cached.
 
+**After upgrading to resume pieces (migration 0005), or after changing the embedding model,** re-embed once. It makes no LLM calls:
+
+```bash
+docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env.production exec app python -m app.reembed --missing-only
+```
+
+Drop `--missing-only` after a model change. Servers created before resume files were stored need their nightly backup script updated to include them: re-create the instance, or copy the files section of `infra/user_data.sh.tftpl` into `/usr/local/bin/talentflow-backup`.
+
 ## 4. Verify
 
 ```bash

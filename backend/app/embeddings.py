@@ -74,19 +74,37 @@ class VoyageEmbedder:
 @lru_cache
 def get_embedder() -> Embedder:
     s = get_settings()
+    if s.embedding_provider == "hash":
+        return HashEmbedder(s.embedding_dim)
     try:
-        if s.embedding_provider == "fastembed":
-            return FastEmbedEmbedder(s.embedding_model, s.embedding_dim, s.embedding_cache_dir)
         if s.embedding_provider == "voyage":
             return VoyageEmbedder(s.embedding_model, s.embedding_dim, s.voyage_api_key)
-    except ImportError:
-        log.warning("%s is not installed; falling back to hash embeddings", s.embedding_provider)
-    return HashEmbedder(s.embedding_dim)
+        return FastEmbedEmbedder(s.embedding_model, s.embedding_dim, s.embedding_cache_dir)
+    except ImportError as e:
+        # Never fall back silently: hash vectors would quietly wreck search quality.
+        package = "voyageai" if s.embedding_provider == "voyage" else "fastembed"
+        raise RuntimeError(
+            f"EMBEDDING_PROVIDER={s.embedding_provider} needs the '{package}' package: pip install {package}"
+        ) from e
+
+
+def model_id() -> str:
+    """Identifies the vectors' model; stored on each resume piece so a model change is detectable."""
+    s = get_settings()
+    return "hash" if s.embedding_provider == "hash" else f"{s.embedding_provider}:{s.embedding_model}:{s.embedding_dim}"
+
+
+def embed_many(texts: list[str], *, kind: str = "document", batch: int = 64) -> list[list[float]]:
+    embedder = get_embedder()
+    out: list[list[float]] = []
+    for i in range(0, len(texts), batch):
+        # Keep inputs to a size every provider accepts.
+        out.extend(embedder.embed([t[:8000] for t in texts[i:i + batch]], kind=kind))
+    return out
 
 
 def embed_one(text: str, *, kind: str = "document") -> list[float]:
-    # Keep inputs to a size every provider accepts.
-    return get_embedder().embed([text[:8000]], kind=kind)[0]
+    return embed_many([text], kind=kind)[0]
 
 
 def cosine(a: list[float], b: list[float]) -> float:

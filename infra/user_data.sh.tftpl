@@ -35,6 +35,11 @@ docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env.producti
   pg_dump -U talentflow --format=custom talentflow \
   | aws s3 cp - "s3://${backup_bucket}/postgres/talentflow-$stamp.dump" --region ${region}
 echo "backup uploaded: talentflow-$stamp.dump"
+# Original resume files (STORAGE_PROVIDER=local). With S3/R2 storage, the bucket holds them instead.
+docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env.production exec -T app \
+  tar czf - -C /data/files . \
+  | aws s3 cp - "s3://${backup_bucket}/files/talentflow-files-$stamp.tar.gz" --region ${region}
+echo "backup uploaded: talentflow-files-$stamp.tar.gz"
 SCRIPT
 chmod +x /usr/local/bin/talentflow-backup
 echo '30 2 * * * root /usr/local/bin/talentflow-backup >> /var/log/talentflow-backup.log 2>&1' > /etc/cron.d/talentflow-backup

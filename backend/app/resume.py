@@ -6,7 +6,6 @@ from datetime import UTC, datetime
 
 from pydantic import BaseModel, Field
 
-from .embeddings import embed_one
 from .llm import run_structured
 from .models import Candidate
 
@@ -350,5 +349,7 @@ def build_candidate(
         resume_text=text,
         resume_filename=filename,
     )
-    candidate.embedding = embed_one(f"{candidate.headline or ''}\nSkills: {', '.join(candidate.skills)}\n{text}")
+    from .search_index import index_candidate  # search_index imports this module
+
+    index_candidate(candidate)
     return candidate

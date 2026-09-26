@@ -74,6 +74,7 @@ class CandidateOut(ORM):
     skills: list[str]
     years_experience: float | None
     resume_filename: str | None
+    has_original_file: bool = False
     do_not_call: bool = False
     created_at: UTCDateTime
 

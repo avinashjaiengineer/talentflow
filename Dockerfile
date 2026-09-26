@@ -8,7 +8,7 @@ RUN npm run build
 
 # ---- backend + built frontend ----
 FROM python:3.12-slim
-ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 EMBEDDING_CACHE_DIR=/models
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 EMBEDDING_CACHE_DIR=/models STORAGE_DIR=/data/files
 WORKDIR /app
 
 COPY backend/requirements.txt ./
@@ -21,7 +21,8 @@ COPY backend/app ./app
 COPY backend/alembic.ini ./
 COPY --from=web /web/dist ./static
 
-RUN useradd --create-home talentflow && chown -R talentflow /app /models
+# /data/files holds original resumes (STORAGE_PROVIDER=local); compose mounts a volume there.
+RUN useradd --create-home talentflow && mkdir -p /data/files && chown -R talentflow /app /models /data/files
 USER talentflow
 
 EXPOSE 8000

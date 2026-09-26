@@ -40,7 +40,8 @@ _All screenshots show demo data from `python -m app.seed`, screened by Claude Op
 
 - **Job portal intake.** Applications that Naukri, LinkedIn, Indeed, and other portals email to your recruiting inbox are imported automatically. The intake agent skips alerts and newsletters, parses the resume, recognizes returning applicants by email, adds each one to the right job, and starts screening. Careers pages and tools like Zapier can also push applications to a webhook. See [integrations](docs/INTEGRATIONS.md#job-portal-intake-resumes-from-naukri-linkedin-indeed-and-others).
 - **AI job descriptions.** Type a few words, like "senior Python dev, 5 yrs, fintech, Bangalore", and the job-writer agent drafts the title, description, and screenable requirements for you to review.
-- **Semantic sourcing.** Resumes and jobs are embedded with pgvector, so "built RAG pipelines" matches a job asking for "LLM applications" even with zero shared keywords.
+- **Hybrid sourcing over whole resumes.** Every resume is split into pieces (a profile summary, each section, each job) and embedded, so skills on page three count as much as page one. Search combines meaning ("built RAG pipelines" matches "LLM applications") with exact keywords ("Kafka", "SAP FICO"), using pgvector HNSW and Postgres full-text indexes. Each match records the keywords found and the passage that matched.
+- **Rich resume parsing.** Work history with dates, education, certifications, projects, and links, plus experience computed from the job dates. The original PDF or DOCX is kept for download (local disk, or S3 / Cloudflare R2).
 - **Evidence-based screening.** Each requirement is marked met, partial, or not met, with a quote from the resume. The agent is instructed to ignore protected characteristics.
 - **Personalized outreach.** Emails reference what actually makes the candidate a fit. Recruiters edit them and click **Send**, and they go out from **Outlook**.
 - **Real scheduling.** Proposed slots avoid interviewers' busy times, and the interview is booked in Outlook with a **Teams meeting**. Invitations are sent automatically.
@@ -149,14 +150,34 @@ Set these in `.env` (or `deploy/.env.production`). See [`.env.example`](.env.exa
 
 A candidate who goes all the way through the pipeline costs roughly **$0.15–$0.40** on Claude Opus 5 at `LLM_EFFORT=high`. That covers six agent calls, mostly spent on output and thinking tokens. To cut costs, lower `LLM_EFFORT` or move simpler agents to `claude-sonnet-5` or `claude-haiku-4-5` with `MODEL_<AGENT>`. Embeddings run locally and cost nothing.
 
-### Embeddings
+### Search: embeddings and indexes
 
-Anthropic doesn't offer an embedding model, so TalentFlow supports two:
+Records and vectors live in one Postgres database with pgvector: candidates, jobs, and the pipeline are saved in the same transaction as their vectors, so they never drift apart. Anthropic doesn't offer an embedding model, so TalentFlow supports two:
 
-- **fastembed** (default): `BAAI/bge-small-en-v1.5` runs locally on the CPU, needs no API key, and is baked into the Docker image.
-- **Voyage AI**: Anthropic's recommended embedding provider. Run `pip install voyageai`, then set `EMBEDDING_PROVIDER=voyage`, `EMBEDDING_MODEL=voyage-3.5`, `EMBEDDING_DIM=1024`, and `VOYAGE_API_KEY`.
+| | **fastembed** (default) | **Voyage AI** |
+|---|---|---|
+| Where it runs | Locally on the CPU; resume text stays on your server | Hosted API (Anthropic's recommended embedding provider) |
+| Setup | Nothing: `BAAI/bge-small-en-v1.5` is baked into the Docker image | `EMBEDDING_PROVIDER=voyage`, `EMBEDDING_MODEL=voyage-3.5`, `EMBEDDING_DIM=1024`, `VOYAGE_API_KEY` |
+| Quality | Good. For better local results try `BAAI/bge-base-en-v1.5` with `EMBEDDING_DIM=768` | Best, and reads much longer inputs |
+| Cost | Free | Low per resume; see Voyage's pricing |
 
-> Changing `EMBEDDING_DIM` changes the vector column size. Start with a fresh database.
+Resumes are embedded in pieces of about 1,500 characters (`EMBEDDING_CHUNK_CHARS`), so every model sees the whole resume. Sourcing ranks candidates by their best-matching piece and by keyword matches, combined with reciprocal rank fusion. On Postgres, an HNSW index keeps vector search fast at millions of pieces, and a GIN full-text index serves the keywords.
+
+**Changing the embedding model** (provider, model, or dimension): set the new values, deploy, then run once:
+
+```bash
+docker compose exec app python -m app.reembed        # or, without Docker: python -m app.reembed
+```
+
+It resizes the vector columns if `EMBEDDING_DIM` changed, rebuilds the indexes, and re-embeds every candidate and job without any LLM calls. Until it runs, the server log warns that the stored vectors don't match the model. If the configured provider's package isn't installed, TalentFlow reports an error instead of silently falling back to lower-quality vectors.
+
+### Original resume files
+
+Uploaded and job-portal resumes are kept so recruiters can download the original.
+
+- **local** (default): files go to `STORAGE_DIR`. Docker Compose mounts the `files` volume at `/data/files`, and the AWS setup backs it up nightly with the database.
+- **s3**: any S3-compatible bucket (AWS S3, Cloudflare R2, MinIO). Set `STORAGE_PROVIDER=s3` and `S3_BUCKET`; for R2 also `S3_ENDPOINT_URL=https://<account-id>.r2.cloudflarestorage.com` and `S3_REGION=auto`, plus `S3_ACCESS_KEY_ID` and `S3_SECRET_ACCESS_KEY`. Downloads use 5-minute presigned links, so the bucket stays private.
+- **none**: keep only the extracted text.
 
 ### Hosted Postgres
 
@@ -173,6 +194,7 @@ POST /api/jobs                          create a job
 POST /api/jobs/{id}/source              queue the sourcing agent (auto-screens matches) → task
 GET  /api/tasks/{id}                    poll a queued agent task
 POST /api/candidates/upload             upload a PDF/DOCX/TXT resume
+GET  /api/candidates/{id}/resume        download the original file
 POST /api/intake/check                  queue a job-portal mailbox check → task
 GET  /api/intake/items                  applications picked up from job portals
 POST /api/intake/webhook                push an application (X-Intake-Token; public)

@@ -1,4 +1,6 @@
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi.concurrency import run_in_threadpool
+from fastapi.responses import RedirectResponse, Response
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
@@ -7,6 +9,7 @@ from ..llm import LLMError
 from ..models import Candidate
 from ..resume import ResumeUnreadable, build_candidate, extract_text
 from ..schemas import ApplicationOut, CandidateDetail, CandidateIn, CandidateOut, CandidateUpdate
+from ..storage import content_type, delete_resume, disposition, get_storage, save_resume
 from .serializers import application_out
 
 router = APIRouter(prefix="/candidates", tags=["candidates"])
@@ -14,13 +17,16 @@ router = APIRouter(prefix="/candidates", tags=["candidates"])
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 
 
-def _create(db: Session, text: str, *, filename: str | None, name: str | None = None, email: str | None = None) -> Candidate:
+def _create(db: Session, text: str, *, filename: str | None, name: str | None = None, email: str | None = None,
+            original: bytes | None = None) -> Candidate:
     try:
         candidate = build_candidate(text, filename=filename, name=name, email=email)
     except LLMError as e:
         raise HTTPException(502, f"Could not parse resume: {e}") from e
     except ResumeUnreadable as e:
         raise HTTPException(422, str(e)) from e
+    if original is not None and filename:
+        candidate.resume_file_key = save_resume(filename, original)
     db.add(candidate)
     db.commit()
     return candidate
@@ -46,7 +52,8 @@ async def upload_resume(file: UploadFile = File(...), db: Session = Depends(get_
         raise HTTPException(415, str(e)) from e
     if len(text) < 20:
         raise HTTPException(422, "Could not read any text from this file (is it a scanned image?)")
-    return _create(db, text, filename=file.filename)
+    # Parsing and embedding take seconds; keep them off the event loop.
+    return await run_in_threadpool(_create, db, text, filename=file.filename, original=data)
 
 
 @router.post("", response_model=CandidateOut, status_code=201)
@@ -86,5 +93,25 @@ def delete_candidate(candidate_id: str, db: Session = Depends(get_db)):
     candidate = db.get(Candidate, candidate_id)
     if candidate is None:
         raise HTTPException(404, "Candidate not found")
+    key = candidate.resume_file_key
     db.delete(candidate)
     db.commit()
+    delete_resume(key)
+
+
+@router.get("/{candidate_id}/resume")
+def download_resume(candidate_id: str, db: Session = Depends(get_db)):
+    """The original resume file, as uploaded or received from a job portal."""
+    candidate = db.get(Candidate, candidate_id)
+    storage = get_storage()
+    if candidate is None or not candidate.resume_file_key or storage is None:
+        raise HTTPException(404, "No original file is stored for this candidate")
+    filename = candidate.resume_filename or "resume"
+    if url := storage.download_url(candidate.resume_file_key, filename):
+        return RedirectResponse(url, status_code=307)
+    try:
+        data = storage.get(candidate.resume_file_key)
+    except FileNotFoundError as e:
+        raise HTTPException(404, "The stored file is missing") from e
+    return Response(data, media_type=content_type(filename),
+                    headers={"Content-Disposition": disposition(filename), "Cache-Control": "private, no-store"})

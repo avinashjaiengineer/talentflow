@@ -17,6 +17,8 @@ x-app: &app
     LOG_FORMAT: json
     DATABASE_URL: postgresql+psycopg://talentflow:${POSTGRES_PASSWORD}@db:5432/talentflow
     COOKIE_SECURE: ${COOKIE_SECURE:-false}
+  volumes:
+    - files:/data/files  # original resumes (STORAGE_PROVIDER=local); back this up with the database
   depends_on:
     db:
       condition: service_healthy
@@ -73,5 +75,6 @@ services:
 
 volumes:
   pgdata:
+  files:
   caddy_data:
   caddy_config:

@@ -52,6 +52,19 @@ class Settings(BaseSettings):
     embedding_dim: int = 384
     embedding_cache_dir: str | None = None  # where fastembed keeps downloaded models
     voyage_api_key: str | None = None
+    # Resumes are embedded in pieces (a profile summary, then each section and job) so the whole
+    # resume is searchable. ~1500 characters is about 375 tokens, inside every model's input limit.
+    embedding_chunk_chars: int = 1500
+
+    # Original resume files. "local" keeps them in STORAGE_DIR (mount a volume in Docker);
+    # "s3" uses any S3-compatible bucket: AWS S3, Cloudflare R2, MinIO; "none" keeps only the text.
+    storage_provider: Literal["local", "s3", "none"] = "local"
+    storage_dir: str = "./data/files"
+    s3_bucket: str | None = None
+    s3_endpoint_url: str | None = None  # e.g. https://<account-id>.r2.cloudflarestorage.com for R2
+    s3_region: str | None = None  # "auto" for R2
+    s3_access_key_id: str | None = None  # leave unset to use the AWS default credential chain
+    s3_secret_access_key: str | None = None
 
     # Scheduling
     company_name: str = "Acme Corp"

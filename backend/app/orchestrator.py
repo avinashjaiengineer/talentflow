@@ -177,12 +177,14 @@ def run_sourcing(db: Session, job: Job, *, limit: int = 20, auto_screen: bool = 
         job.embedding = embed_one(f"{job.title}\n{job.description}\n{' '.join(job.requirements)}")
     matches = sourcing.find_matches(db, job, limit=limit)
     ids = []
-    for candidate, similarity in matches:
-        app = Application(job=job, candidate=candidate, match_score=similarity)
+    for m in matches:
+        app = Application(job=job, candidate=m.candidate, match_score=m.similarity)
         db.add(app)
         db.flush()
+        why = f"; keywords: {', '.join(m.keywords[:6])}" if m.keywords else ""
         log_event(db, actor="sourcing", type="sourced",
-                  message=f"Matched {candidate.name} (similarity {similarity:.2f})", application=app)
+                  message=f"Matched {m.candidate.name} (similarity {m.similarity:.2f}{why})", application=app,
+                  data={"similarity": m.similarity, "keywords": m.keywords, "passage": (m.passage or "")[:600] or None})
         if auto_screen:
             _move(db, app, Stage.screening, actor="orchestrator")
         ids.append(app.id)

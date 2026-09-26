@@ -23,12 +23,29 @@ log = logging.getLogger("talentflow.http")
 settings = get_settings()
 
 
+def _check_search_index(db) -> None:
+    """Say loudly when the stored vectors don't match the configured embedding model."""
+    from .reembed import dimension_mismatches
+    from .search_index import stale_piece_count, unindexed_count
+
+    if tables := dimension_mismatches():
+        log.error("EMBEDDING_DIM is %d but the %s vector columns differ. Run: python -m app.reembed",
+                  settings.embedding_dim, ", ".join(tables))
+    elif stale := stale_piece_count(db):
+        log.warning("%d resume pieces were embedded with a different model and are ignored by search. "
+                    "Run: python -m app.reembed", stale)
+    if missing := unindexed_count(db):
+        log.warning("%d candidates have no resume pieces yet (search uses their whole-resume vector). "
+                    "Run: python -m app.reembed --missing-only", missing)
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     if settings.auto_migrate:
         init_db()
     with SessionLocal() as db:
         auth.ensure_bootstrap_admin(db)
+        _check_search_index(db)
     # Load the embedding model in the background so the first upload after a deploy isn't slow.
     threading.Thread(target=get_embedder, name="warm-embedder", daemon=True).start()
     embedded = None

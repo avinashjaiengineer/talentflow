@@ -30,6 +30,7 @@ from .integrations.mailbox import Attachment, GraphMailbox, get_mailbox, pick_re
 from .llm import LLMError
 from .models import AgentTask, Candidate, IntakeItem, IntakeStatus, Job, JobStatus, TaskKind, TaskStatus
 from .resume import ResumeUnreadable, build_candidate, extract_text
+from .storage import save_resume
 
 log = logging.getLogger(__name__)
 
@@ -145,6 +146,8 @@ def _import(db: Session, item: Inbound, record: IntakeItem) -> None:
             return
         candidate = existing_candidate(db, parsed.email)
         if candidate is None:
+            if item.resume is not None:
+                parsed.resume_file_key = save_resume(item.resume.filename, item.resume.data)
             db.add(parsed)
             db.flush()
             candidate, is_new = parsed, True

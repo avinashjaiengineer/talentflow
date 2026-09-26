@@ -7,6 +7,8 @@ __pycache__/
 *.db
 *.db-shm
 *.db-wal
+# Original resumes in local storage (STORAGE_DIR)
+data/
 
 # Node
 node_modules/

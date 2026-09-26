@@ -35,6 +35,7 @@ export interface Candidate {
   skills: string[];
   years_experience: number | null;
   resume_filename: string | null;
+  has_original_file: boolean;
   do_not_call: boolean;
   created_at: string;
   resume_text?: string;

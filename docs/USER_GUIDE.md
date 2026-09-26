@@ -40,7 +40,7 @@ TalentFlow is a hiring pipeline run by **seven AI agents** (powered by Claude) a
 |---|---|---|
 | **Intake** | Reads applications that job portals email to your inbox (or push to the webhook), skips alerts and newsletters, and matches each to an open job | New applicants in the right pipeline, already being screened |
 | **Job writer** | Turns a few words about a role into a full job posting | A draft title, description, and requirements for you to review |
-| **Sourcing** | Reads the job, writes an "ideal candidate" profile, and searches your talent pool **by meaning**, not just keywords | A ranked list of matching candidates |
+| **Sourcing** | Reads the job, writes an "ideal candidate" profile, and searches every part of every resume **by meaning and by keyword** | A ranked list of matching candidates; the activity log shows the keywords found for each |
 | **Screening** | Checks the resume against **each requirement** | A score (0–100), met/partial/not-met per requirement with a quote as evidence, strengths, gaps, and a recommendation |
 | **Outreach** | Writes a short, personal first-contact email | Subject and body referencing the candidate's actual background |
 | **Scheduling** | Proposes three interview slots in working hours | Slots and an invitation email |
@@ -120,7 +120,8 @@ Go to **Talent pool**.
 
 **What happens on upload:**
 1. Claude reads the resume and extracts the name, email, phone, location, headline, skills, years of experience, **work history** (title, company, dates), **education**, **certifications**, **projects**, and profile links such as LinkedIn and GitHub. TalentFlow also works out total experience from the job dates, counting overlapping jobs once, and shows it next to the work history as a cross-check.
-2. The resume is turned into an *embedding* (a numerical fingerprint of its meaning) so the sourcing agent can find it later.
+2. The resume is split into pieces (a profile summary, each section, and each job), and each piece is turned into an *embedding* (a numerical fingerprint of its meaning). The sourcing agent can then find a match anywhere in the resume, not just on the first page.
+3. The original file is kept. Open the candidate and click **Download original** to see exactly what they sent.
 
 Each file takes about 5–10 seconds, so a batch of 10 takes about a minute.
 
@@ -372,7 +373,7 @@ The agents reason each time, so scores can vary by a few points. Differences of 
 Not yet. Each candidate is screened once per job. If the resume changes a lot, upload it as a new candidate.
 
 **Is candidate data sent to Anthropic?**
-Resume text, job details, and interview notes are sent to the Claude API for processing, under your organization's Anthropic agreement. Embeddings are computed on your own server.
+Resume text, job details, and interview notes are sent to the Claude API for processing, under your organization's Anthropic agreement. By default, embeddings are computed on your own server; if your admin switches to Voyage AI embeddings, resume text is also sent to Voyage.
 
 **How long does each step take?**
 Parsing 5–10 s; screening about 10 s per candidate; outreach and scheduling 5–10 s; evaluation 10–20 s.

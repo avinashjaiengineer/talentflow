@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { FileText, Trash2, Upload, Users } from "lucide-react";
+import { Download, FileText, Trash2, Upload, Users } from "lucide-react";
 import { type ReactNode, useRef, useState } from "react";
 import { api, type Candidate, type CandidateProfile } from "../api";
 import IntakePanel from "../components/IntakePanel";
@@ -204,7 +204,14 @@ function CandidateBody({ c, apps, onDelete }: { c: Candidate; apps: Awaited<Retu
         </div>
       )}
       <div>
-        <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">Resume {c.resume_filename && `· ${c.resume_filename}`}</p>
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Resume {c.resume_filename && `· ${c.resume_filename}`}</p>
+          {c.has_original_file && (
+            <a href={`/api/candidates/${c.id}/resume`} className="inline-flex items-center gap-1 text-xs text-indigo-600 hover:underline">
+              <Download className="size-3.5" /> Download original
+            </a>
+          )}
+        </div>
         <pre className="max-h-96 overflow-y-auto whitespace-pre-wrap rounded-lg bg-slate-50 p-4 font-sans text-sm text-slate-700">{c.resume_text}</pre>
       </div>
     </div>
