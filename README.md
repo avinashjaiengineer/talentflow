@@ -40,6 +40,7 @@ _All screenshots show demo data from `python -m app.seed`, screened by Claude Op
 
 - **Job portal intake.** Applications that Naukri, LinkedIn, Indeed, and other portals email to your recruiting inbox are imported automatically. The intake agent skips alerts and newsletters, parses the resume, recognizes returning applicants by email, adds each one to the right job, and starts screening. Careers pages and tools like Zapier can also push applications to a webhook. See [integrations](docs/INTEGRATIONS.md#job-portal-intake-resumes-from-naukri-linkedin-indeed-and-others).
 - **AI job descriptions.** Type a few words, like "senior Python dev, 5 yrs, fintech, Bangalore", and the job-writer agent drafts the title, description, and screenable requirements for you to review.
+- **Skill groups.** The parsing agent files every candidate under 1-3 skill groups (Backend Engineering, Data Science & ML, Design, Sales & Marketing, and more), and the talent pool can be filtered by group. When you source candidates, the job title decides which groups are searched: a Senior Backend Engineer job searches Backend and Full-Stack Engineering, not Design.
 - **Hybrid sourcing over whole resumes.** Every resume is split into pieces (a profile summary, each section, each job) and embedded, so skills on page three count as much as page one. Search combines meaning ("built RAG pipelines" matches "LLM applications") with exact keywords ("Kafka", "SAP FICO"), using pgvector HNSW and Postgres full-text indexes. Each match records the keywords found and the passage that matched.
 - **Rich resume parsing.** Work history with dates, education, certifications, projects, and links, plus experience computed from the job dates. The original PDF or DOCX is kept for download (local disk, or S3 / Cloudflare R2).
 - **Evidence-based screening.** Each requirement is marked met, partial, or not met, with a quote from the resume. The agent is instructed to ignore protected characteristics.
@@ -99,7 +100,7 @@ npm run dev
 |---|---|---|
 | **Intake** | Reads applications emailed by job portals (or pushed to the webhook), skips non-applications, and matches each one to an open job | Candidates added to the right pipeline |
 | **Job writer** | Expands a recruiter's few-word brief into a full job posting | Title, description, requirements (a draft to review) |
-| **Sourcing** | Writes an "ideal candidate" profile for the job, embeds it, and runs a vector search over the talent pool | Ranked matches |
+| **Sourcing** | Picks the skill groups to search from the job title, then runs hybrid (vector + keyword) search over every resume piece in those groups | Ranked matches |
 | **Screening** | Scores the resume against each requirement | Score 0–100, met/partial/not-met with evidence, recommendation |
 | **Outreach** | Drafts a personalized first-contact email | Subject and body |
 | **Scheduling** | Proposes slots and writes the invitation | Slots and invite email |

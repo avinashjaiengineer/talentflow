@@ -14,13 +14,13 @@ import re
 from collections import defaultdict
 from dataclasses import dataclass, field
 
-from sqlalchemy import Float, bindparam, func, literal_column, select, text
+from sqlalchemy import Float, bindparam, exists, func, literal_column, or_, select, text
 from sqlalchemy.orm import Session
 
 from .config import get_settings
 from .db import is_postgres
 from .embeddings import cosine, embed_many, embed_one, model_id
-from .models import Application, Candidate, ResumeChunk
+from .models import Application, Candidate, CandidateSkillGroup, ResumeChunk
 from .resume import _RANGE, _heading
 
 # Must match the ix_candidates_fts index expression (migration 0005) exactly.
@@ -126,15 +126,35 @@ def _excluded(job_id: str | None):
     return select(Application.candidate_id).where(Application.job_id == job_id)
 
 
+def _pool(col, *, exclude_job_id: str | None, groups: list[str] | None):
+    """Candidates eligible for a search: not already in the job, and in one of the skill groups.
+    Candidates without any group yet are always eligible, so nobody silently drops out."""
+    clause = col.not_in(_excluded(exclude_job_id))
+    if groups:
+        in_groups = select(CandidateSkillGroup.candidate_id).where(CandidateSkillGroup.name.in_(groups))
+        ungrouped = ~exists().where(CandidateSkillGroup.candidate_id == col)
+        clause = clause & or_(col.in_(in_groups), ungrouped)
+    return clause
+
+
+def group_is_empty(db: Session, groups: list[str]) -> bool:
+    """True when no candidate in the pool belongs to any of these groups."""
+    return db.scalar(
+        select(CandidateSkillGroup.candidate_id).where(CandidateSkillGroup.name.in_(groups)).limit(1)
+    ) is None
+
+
 def _keep_best(hits: dict, cid: str, sim: float, passage: str | None) -> None:
     if cid not in hits or sim > hits[cid][0]:
         hits[cid] = (sim, passage)
 
 
-def vector_hits(db: Session, query: list[float], *, exclude_job_id: str | None, pool: int) -> dict[str, tuple[float, str | None]]:
+def vector_hits(db: Session, query: list[float], *, exclude_job_id: str | None, pool: int,
+                groups: list[str] | None = None) -> dict[str, tuple[float, str | None]]:
     """{candidate_id: (best similarity, best passage)} for the nearest resume pieces."""
     model, hits = model_id(), {}
-    excluded = _excluded(exclude_job_id)
+    chunk_pool = _pool(ResumeChunk.candidate_id, exclude_job_id=exclude_job_id, groups=groups)
+    cand_pool = _pool(Candidate.id, exclude_job_id=exclude_job_id, groups=groups)
     legacy = ~Candidate.chunks.any()  # indexed before resume pieces existed: use the whole-resume vector
 
     if is_postgres():
@@ -146,7 +166,7 @@ def vector_hits(db: Session, query: list[float], *, exclude_job_id: str | None, 
         dist = ResumeChunk.embedding.op("<=>", return_type=Float)(vec)
         rows = db.execute(
             select(ResumeChunk.candidate_id, ResumeChunk.text, dist)
-            .where(ResumeChunk.model == model, ResumeChunk.embedding.is_not(None), ResumeChunk.candidate_id.not_in(excluded))
+            .where(ResumeChunk.model == model, ResumeChunk.embedding.is_not(None), chunk_pool)
             .order_by(dist).limit(pool)
         ).all()
         for cid, piece, d in rows:
@@ -154,7 +174,7 @@ def vector_hits(db: Session, query: list[float], *, exclude_job_id: str | None, 
         cdist = Candidate.embedding.op("<=>", return_type=Float)(vec)
         for cid, d in db.execute(
             select(Candidate.id, cdist)
-            .where(Candidate.embedding.is_not(None), Candidate.id.not_in(excluded), legacy)
+            .where(Candidate.embedding.is_not(None), cand_pool, legacy)
             .order_by(cdist).limit(pool)
         ).all():
             _keep_best(hits, cid, 1.0 - float(d), None)
@@ -162,12 +182,12 @@ def vector_hits(db: Session, query: list[float], *, exclude_job_id: str | None, 
 
     rows = db.execute(
         select(ResumeChunk.candidate_id, ResumeChunk.text, ResumeChunk.embedding)
-        .where(ResumeChunk.model == model, ResumeChunk.embedding.is_not(None), ResumeChunk.candidate_id.not_in(excluded))
+        .where(ResumeChunk.model == model, ResumeChunk.embedding.is_not(None), chunk_pool)
     ).all()
     for cid, piece, emb in rows:
         _keep_best(hits, cid, cosine(query, emb), piece)
     for cid, emb in db.execute(
-        select(Candidate.id, Candidate.embedding).where(Candidate.embedding.is_not(None), Candidate.id.not_in(excluded), legacy)
+        select(Candidate.id, Candidate.embedding).where(Candidate.embedding.is_not(None), cand_pool, legacy)
     ).all():
         _keep_best(hits, cid, cosine(query, emb), None)
     return dict(sorted(hits.items(), key=lambda kv: -kv[1][0])[:pool])
@@ -189,21 +209,22 @@ def similarity_for(db: Session, query: list[float], ids: list[str]) -> dict[str,
     return hits
 
 
-def keyword_hits(db: Session, terms: list[str], *, exclude_job_id: str | None, pool: int) -> list[str]:
+def keyword_hits(db: Session, terms: list[str], *, exclude_job_id: str | None, pool: int,
+                 groups: list[str] | None = None) -> list[str]:
     """Candidate ids ranked by keyword relevance; only candidates matching at least one term."""
     if not terms:
         return []
-    excluded = _excluded(exclude_job_id)
+    eligible = _pool(Candidate.id, exclude_job_id=exclude_job_id, groups=groups)
     if is_postgres():
         # websearch_to_tsquery never raises on user input; quoted terms are matched as phrases.
         query = func.websearch_to_tsquery("simple", " OR ".join(f'"{t}"' for t in terms))
         doc = literal_column(FTS_DOCUMENT)
         return list(db.scalars(
-            select(Candidate.id).where(doc.op("@@")(query), Candidate.id.not_in(excluded))
+            select(Candidate.id).where(doc.op("@@")(query), eligible)
             .order_by(func.ts_rank_cd(doc, query).desc()).limit(pool)
         ))
     scored = []
-    for c in db.scalars(select(Candidate).where(Candidate.id.not_in(excluded))):
+    for c in db.scalars(select(Candidate).where(eligible)):
         if n := len(matched_terms(c, terms)):
             scored.append((n, c.id))
     return [cid for _, cid in sorted(scored, key=lambda x: -x[0])[:pool]]
@@ -219,13 +240,14 @@ def fuse(*rankings: list[str], k: int = RRF_K) -> list[str]:
 
 
 def hybrid_search(
-    db: Session, *, query_text: str, terms: list[str], exclude_job_id: str | None, limit: int, min_similarity: float = 0.0
+    db: Session, *, query_text: str, terms: list[str], exclude_job_id: str | None, limit: int, min_similarity: float = 0.0,
+    groups: list[str] | None = None,
 ) -> list[Match]:
     query = embed_one(query_text, kind="query")
     terms = clean_terms(terms)
     pool = max(limit * 5, 50)
-    vhits = vector_hits(db, query, exclude_job_id=exclude_job_id, pool=pool)
-    ranked = fuse(sorted(vhits, key=lambda cid: -vhits[cid][0]), keyword_hits(db, terms, exclude_job_id=exclude_job_id, pool=pool))
+    vhits = vector_hits(db, query, exclude_job_id=exclude_job_id, pool=pool, groups=groups)
+    ranked = fuse(sorted(vhits, key=lambda cid: -vhits[cid][0]), keyword_hits(db, terms, exclude_job_id=exclude_job_id, pool=pool, groups=groups))
     ranked = ranked[: limit * 3]
     vhits.update(similarity_for(db, query, [cid for cid in ranked if cid not in vhits]))
     candidates = {c.id: c for c in db.scalars(select(Candidate).where(Candidate.id.in_(ranked)))}

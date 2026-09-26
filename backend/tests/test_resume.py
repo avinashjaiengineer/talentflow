@@ -122,6 +122,7 @@ def test_claude_output_is_converted_to_the_profile():
     p = _to_profile(_Extraction(
         name="Arjun Mehta", email="", phone="", location="Bengaluru", headline="Staff Engineer", skills=["Python"],
         years_experience=-1, links=[" github.com/arjun "], certifications=[""], projects=[],
+        skill_groups=["Backend Engineering", "DevOps & Cloud"],
         employment_history=[_Job(title="Staff Engineer", company="Razorpay", location="", start="2019", end="present", summary="")],
         education=[_Degree(degree="", field="", institution="", year=""), _Degree(degree="B.Tech", field="CS", institution="", year="2015")],
     ))
@@ -129,3 +130,4 @@ def test_claude_output_is_converted_to_the_profile():
     assert p.links == ["github.com/arjun"] and p.certifications == []
     assert p.employment_history[0].company == "Razorpay" and p.employment_history[0].location is None
     assert [e.degree for e in p.education] == ["B.Tech"]
+    assert p.skill_groups == ["Backend Engineering", "DevOps & Cloud"]

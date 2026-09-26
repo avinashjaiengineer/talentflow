@@ -40,7 +40,7 @@ TalentFlow is a hiring pipeline run by **seven AI agents** (powered by Claude) a
 |---|---|---|
 | **Intake** | Reads applications that job portals email to your inbox (or push to the webhook), skips alerts and newsletters, and matches each to an open job | New applicants in the right pipeline, already being screened |
 | **Job writer** | Turns a few words about a role into a full job posting | A draft title, description, and requirements for you to review |
-| **Sourcing** | Reads the job, writes an "ideal candidate" profile, and searches every part of every resume **by meaning and by keyword** | A ranked list of matching candidates; the activity log shows the keywords found for each |
+| **Sourcing** | Uses the **job title** to pick which skill groups to search, then searches every part of every resume in those groups **by meaning and by keyword** | A ranked list of matching candidates; the activity log shows the keywords found for each |
 | **Screening** | Checks the resume against **each requirement** | A score (0–100), met/partial/not-met per requirement with a quote as evidence, strengths, gaps, and a recommendation |
 | **Outreach** | Writes a short, personal first-contact email | Subject and body referencing the candidate's actual background |
 | **Scheduling** | Proposes three interview slots in working hours | Slots and an invitation email |
@@ -121,7 +121,8 @@ Go to **Talent pool**.
 **What happens on upload:**
 1. Claude reads the resume and extracts the name, email, phone, location, headline, skills, years of experience, **work history** (title, company, dates), **education**, **certifications**, **projects**, and profile links such as LinkedIn and GitHub. TalentFlow also works out total experience from the job dates, counting overlapping jobs once, and shows it next to the work history as a cross-check.
 2. The resume is split into pieces (a profile summary, each section, and each job), and each piece is turned into an *embedding* (a numerical fingerprint of its meaning). The sourcing agent can then find a match anywhere in the resume, not just on the first page.
-3. The original file is kept. Open the candidate and click **Download original** to see exactly what they sent.
+3. The candidate is filed under 1-3 **skill groups**, such as Backend Engineering, Data Science & ML, or Design (UI/UX), judged from their roles and main skills. Use the **Skill groups** buttons above the list to see one group at a time.
+4. The original file is kept. Open the candidate and click **Download original** to see exactly what they sent.
 
 Each file takes about 5–10 seconds, so a batch of 10 takes about a minute.
 
@@ -168,7 +169,7 @@ After creating it, you land on the job's **pipeline board**.
 ### Step 1: Find candidates
 
 On the job page, choose one:
-- **Source candidates:** the sourcing agent searches the whole talent pool and adds the best 10 matches that aren't already in this pipeline. Screening starts automatically for each one. You'll see "The sourcing agent is searching…", then how many it found.
+- **Source candidates:** the sourcing agent uses the job title to choose the skill groups to search (a "Senior Backend Engineer" job searches Backend and Full-Stack Engineering; a "Product Designer" job searches Design), then adds the best 10 matches from those groups that aren't already in this pipeline. The groups it searched are shown under **Job description & requirements**. If nobody is in those groups yet, it searches the whole pool and says so. Screening starts automatically for each one. You'll see "The sourcing agent is searching…", then how many it found.
 - **Add candidate:** pick a specific person from the pool. They're added and screened automatically.
 
 Cards appear in **Sourced & screening** with a spinner, then move to **Needs review** with a score, usually about 10 seconds per candidate.

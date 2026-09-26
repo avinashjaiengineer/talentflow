@@ -15,7 +15,9 @@ export default function CandidatesPage() {
   const [uploads, setUploads] = useState<UploadState[]>([]);
   const [dragging, setDragging] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
-  const { data: candidates, isLoading } = useQuery({ queryKey: ["candidates", q], queryFn: () => api.candidates(q) });
+  const [group, setGroup] = useState<string | null>(null);
+  const { data: candidates, isLoading } = useQuery({ queryKey: ["candidates", q, group], queryFn: () => api.candidates(q, group ?? undefined) });
+  const { data: groups = [] } = useQuery({ queryKey: ["candidates", "groups"], queryFn: api.candidateGroups });
 
   async function uploadFiles(files: FileList | File[]) {
     const list = Array.from(files);
@@ -89,6 +91,17 @@ export default function CandidatesPage() {
         )}
       </div>
 
+      {groups.length > 0 && (
+        <div className="mb-4">
+          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">Skill groups</p>
+          <div className="flex flex-wrap gap-2">
+            <GroupChip label="All" active={!group} onClick={() => setGroup(null)} />
+            {groups.map((g) => (
+              <GroupChip key={g.name} label={g.name} count={g.count} active={group === g.name} onClick={() => setGroup(group === g.name ? null : g.name)} />
+            ))}
+          </div>
+        </div>
+      )}
       <input className="input mb-4 max-w-sm" placeholder="Search by name, title, or skill" value={q} onChange={(e) => setQ(e.target.value)} />
 
       {isLoading ? (
@@ -114,6 +127,9 @@ export default function CandidatesPage() {
                   <td className="px-4 py-3">
                     <p className="font-medium">{c.name}</p>
                     <p className="line-clamp-1 text-xs text-slate-500">{c.headline}</p>
+                    {c.skill_groups.length > 0 && (
+                      <p className="mt-1 text-xs font-medium text-teal-700">{c.skill_groups.join(" · ")}</p>
+                    )}
                   </td>
                   <td className="hidden px-4 py-3 md:table-cell">
                     <div className="flex flex-wrap gap-1">
@@ -135,6 +151,21 @@ export default function CandidatesPage() {
         {selected && <CandidateDetail id={selected} onDeleted={() => setSelected(null)} />}
       </Modal>
     </>
+  );
+}
+
+function GroupChip({ label, count, active, onClick }: { label: string; count?: number; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "rounded-full border px-3 py-1 text-sm transition",
+        active ? "border-indigo-600 bg-indigo-600 text-white" : "border-slate-300 bg-white text-slate-700 hover:border-indigo-300",
+      )}
+    >
+      {label}
+      {count !== undefined && <span className={cn("ml-1.5 tabular-nums", active ? "text-indigo-100" : "text-slate-400")}>{count}</span>}
+    </button>
   );
 }
 
@@ -188,6 +219,9 @@ function CandidateBody({ c, apps, onDelete }: { c: Candidate; apps: Awaited<Retu
         <Button variant="danger" onClick={onDelete}><Trash2 className="size-4" /> Delete</Button>
       </div>
       <ContactDetails c={c} />
+      {c.skill_groups.length > 0 && (
+        <div className="flex flex-wrap gap-1">{c.skill_groups.map((g) => <Badge key={g} className="bg-teal-100 text-teal-800">{g}</Badge>)}</div>
+      )}
       <div className="flex flex-wrap gap-1">{c.skills.map((s) => <Badge key={s}>{s}</Badge>)}</div>
       {c.profile && <ProfileDetails p={c.profile} />}
       {apps.length > 0 && (

@@ -165,5 +165,7 @@ def test_review_queue_leads_with_strongest_candidates(client, work):
     _source(client, work, job["id"], 6)
     queue = client.get("/api/approvals?status=pending").json()
     scores = [a["score"] for a in queue]
-    assert len(queue) == 6 and all(a["score_max"] == 100 for a in queue)
+    # 5, not 6: the backend job searches the engineering groups, so the designer isn't sourced.
+    assert len(queue) == 5 and all(a["score_max"] == 100 for a in queue)
+    assert "Sofia Alvarez" not in {a["candidate_name"] for a in queue}
     assert scores == sorted(scores, reverse=True)

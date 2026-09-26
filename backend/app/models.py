@@ -64,6 +64,8 @@ class Job(Base):
     # Interviewers whose calendars are checked for free slots and who join the Teams meeting.
     interviewer_emails: Mapped[list[str]] = mapped_column(JSON, default=list)
     status: Mapped[JobStatus] = mapped_column(Enum(JobStatus), default=JobStatus.open)
+    # The skill groups the sourcing agent searches for this job, chosen from the job title.
+    skill_groups: Mapped[list[str] | None] = mapped_column(JSON)
     embedding: Mapped[list[float] | None] = mapped_column(EmbeddingType(EMBEDDING_DIM))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
@@ -94,10 +96,32 @@ class Candidate(Base):
     chunks: Mapped[list["ResumeChunk"]] = relationship(
         back_populates="candidate", cascade="all, delete-orphan", order_by="ResumeChunk.position"
     )
+    group_links: Mapped[list["CandidateSkillGroup"]] = relationship(
+        cascade="all, delete-orphan", order_by="CandidateSkillGroup.position", lazy="selectin"
+    )
 
     @property
     def has_original_file(self) -> bool:
         return self.resume_file_key is not None
+
+    @property
+    def skill_groups(self) -> list[str]:
+        """The candidate's skill groups (skill_groups.py), most relevant first."""
+        return [link.name for link in self.group_links]
+
+    def set_skill_groups(self, groups: list[str]) -> None:
+        self.group_links = [CandidateSkillGroup(name=g, position=i) for i, g in enumerate(groups)]
+
+
+class CandidateSkillGroup(Base):
+    """A candidate's membership in a skill group. A table (not a JSON list) so sourcing can
+    filter the pool by group with an index on any database."""
+
+    __tablename__ = "candidate_skill_groups"
+
+    candidate_id: Mapped[str] = mapped_column(ForeignKey("candidates.id", ondelete="CASCADE"), primary_key=True)
+    name: Mapped[str] = mapped_column(String(60), primary_key=True, index=True)
+    position: Mapped[int] = mapped_column(Integer, default=0)
 
 
 class ResumeChunk(Base):

@@ -56,6 +56,12 @@ class JobOut(ORM):
     status: JobStatus
     created_at: UTCDateTime
     stage_counts: dict[str, int] = {}
+    skill_groups: list[str] | None = None  # searched by the sourcing agent, chosen from the title
+
+
+class GroupCount(BaseModel):
+    name: str
+    count: int
 
 
 class CandidateIn(BaseModel):
@@ -75,6 +81,7 @@ class CandidateOut(ORM):
     years_experience: float | None
     resume_filename: str | None
     has_original_file: bool = False
+    skill_groups: list[str] = []
     do_not_call: bool = False
     created_at: UTCDateTime
 

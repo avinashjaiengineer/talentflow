@@ -1,14 +1,14 @@
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import RedirectResponse, Response
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from ..db import get_db
 from ..llm import LLMError
-from ..models import Candidate
+from ..models import Candidate, CandidateSkillGroup
 from ..resume import ResumeUnreadable, build_candidate, extract_text
-from ..schemas import ApplicationOut, CandidateDetail, CandidateIn, CandidateOut, CandidateUpdate
+from ..schemas import ApplicationOut, CandidateDetail, CandidateIn, CandidateOut, CandidateUpdate, GroupCount
 from ..storage import content_type, delete_resume, disposition, get_storage, save_resume
 from .serializers import application_out
 
@@ -33,12 +33,23 @@ def _create(db: Session, text: str, *, filename: str | None, name: str | None = 
 
 
 @router.get("", response_model=list[CandidateOut])
-def list_candidates(q: str | None = None, db: Session = Depends(get_db)):
+def list_candidates(q: str | None = None, group: str | None = None, db: Session = Depends(get_db)):
     stmt = select(Candidate).order_by(Candidate.created_at.desc())
+    if group:
+        stmt = stmt.where(Candidate.id.in_(select(CandidateSkillGroup.candidate_id).where(CandidateSkillGroup.name == group)))
     if q:
         like = f"%{q}%"
         stmt = stmt.where(or_(Candidate.name.ilike(like), Candidate.headline.ilike(like), Candidate.resume_text.ilike(like)))
     return db.scalars(stmt.limit(500)).all()
+
+
+@router.get("/groups", response_model=list[GroupCount])
+def skill_group_counts(db: Session = Depends(get_db)):
+    """How many candidates are in each skill group, largest first."""
+    rows = db.execute(
+        select(CandidateSkillGroup.name, func.count()).group_by(CandidateSkillGroup.name).order_by(func.count().desc())
+    ).all()
+    return [GroupCount(name=name, count=n) for name, n in rows]
 
 
 @router.post("/upload", response_model=CandidateOut, status_code=201)

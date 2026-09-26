@@ -87,14 +87,19 @@ export default function JobDetail() {
             : sourceTask.status === "failed"
               ? `Sourcing failed: ${sourceTask.last_error}`
               : sourceTask.result?.count
-                ? `The sourcing agent found ${sourceTask.result.count} new candidates. The screening agent is reviewing them now.`
-                : "No new matching candidates in the talent pool. Upload more resumes to widen the search."}
+                ? `The sourcing agent found ${sourceTask.result.count} new candidates in ${sourceTask.result.groups?.join(", ") ?? "the talent pool"}${sourceTask.result.widened ? " (no one in those groups yet, so it searched everyone)" : ""}. The screening agent is reviewing them now.`
+                : `No new matching candidates${sourceTask.result?.groups?.length ? ` in ${sourceTask.result.groups.join(", ")}` : ""}. Upload more resumes to widen the search.`}
         </p>
       )}
       <ErrorNote error={source.error} />
 
       <details className="mb-6 rounded-xl border border-slate-200 bg-white p-4 text-sm">
         <summary className="cursor-pointer font-medium text-slate-700">Job description & requirements</summary>
+        {job.skill_groups?.length ? (
+          <p className="mt-3 text-xs text-slate-500">
+            Sourcing searches: <span className="font-medium text-teal-700">{job.skill_groups.join(" · ")}</span> (chosen from the job title)
+          </p>
+        ) : null}
         <p className="mt-3 whitespace-pre-wrap text-slate-600">{job.description}</p>
         <div className="mt-3 flex flex-wrap gap-1">{job.requirements.map((r) => <Badge key={r}>{r}</Badge>)}</div>
         {job.interviewer_emails.length > 0 && <p className="mt-3 text-xs text-slate-500">Interviewers: {job.interviewer_emails.join(", ")}</p>}

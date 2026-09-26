@@ -23,6 +23,7 @@ export interface Job {
   status: "open" | "closed";
   created_at: string;
   stage_counts: Record<string, number>;
+  skill_groups: string[] | null;
 }
 
 export interface Candidate {
@@ -36,6 +37,7 @@ export interface Candidate {
   years_experience: number | null;
   resume_filename: string | null;
   has_original_file: boolean;
+  skill_groups: string[];
   do_not_call: boolean;
   created_at: string;
   resume_text?: string;
@@ -201,7 +203,7 @@ export interface Task {
   status: "queued" | "running" | "succeeded" | "failed";
   application_id: string | null;
   job_id: string | null;
-  result: { application_ids?: string[]; count: number } | null;
+  result: { application_ids?: string[]; count: number; groups?: string[]; widened?: boolean } | null;
   attempts: number;
   last_error: string | null;
 }
@@ -313,7 +315,13 @@ export const api = {
   addToJob: (jobId: string, candidateId: string) =>
     request<Application>(`/jobs/${jobId}/applications`, json("POST", { candidate_id: candidateId, auto_screen: true })),
 
-  candidates: (q?: string) => request<Candidate[]>(`/candidates${q ? `?q=${encodeURIComponent(q)}` : ""}`),
+  candidates: (q?: string, group?: string) => {
+    const params = new URLSearchParams();
+    if (q) params.set("q", q);
+    if (group) params.set("group", group);
+    return request<Candidate[]>(`/candidates${params.size ? `?${params}` : ""}`);
+  },
+  candidateGroups: () => request<{ name: string; count: number }[]>("/candidates/groups"),
   candidate: (id: string) => request<Candidate>(`/candidates/${id}`),
   candidateApplications: (id: string) => request<Application[]>(`/candidates/${id}/applications`),
   uploadResume: (file: File) => {

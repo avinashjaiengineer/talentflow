@@ -175,9 +175,15 @@ def run_sourcing(db: Session, job: Job, *, limit: int = 20, auto_screen: bool = 
     """Sourcing agent: add the best-matching pool candidates to this job at stage `sourced`."""
     if job.embedding is None:
         job.embedding = embed_one(f"{job.title}\n{job.description}\n{' '.join(job.requirements)}")
-    matches = sourcing.find_matches(db, job, limit=limit)
+    result = sourcing.find_matches(db, job, limit=limit)
+    job.skill_groups = result.groups
+    where = ", ".join(result.groups)
+    log_event(db, actor="sourcing", type="groups_chosen", job_id=job.id,
+              message=(f"No candidates in {where} yet, so searched the whole talent pool" if result.widened
+                       else f"Searching {where} for {job.title}"),
+              data={"groups": result.groups, "widened": result.widened})
     ids = []
-    for m in matches:
+    for m in result.matches:
         app = Application(job=job, candidate=m.candidate, match_score=m.similarity)
         db.add(app)
         db.flush()
@@ -189,8 +195,8 @@ def run_sourcing(db: Session, job: Job, *, limit: int = 20, auto_screen: bool = 
             _move(db, app, Stage.screening, actor="orchestrator")
         ids.append(app.id)
     log_event(db, actor="sourcing", type="sourcing_complete",
-              message=f"Found {len(ids)} new candidates for {job.title}", job_id=job.id)
-    return {"application_ids": ids, "count": len(ids)}
+              message=f"Found {len(ids)} new candidates for {job.title} in {where}", job_id=job.id)
+    return {"application_ids": ids, "count": len(ids), "groups": result.groups, "widened": result.widened}
 
 
 # ---------------------------------------------------------------- entry points (API)
