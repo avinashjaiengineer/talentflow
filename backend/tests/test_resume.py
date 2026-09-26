@@ -105,3 +105,27 @@ def test_text_that_is_not_a_resume_is_refused(client):
     assert r.status_code == 422
     assert "Is this a resume?" in r.json()["detail"]
     assert client.get("/api/candidates").json() == []
+
+
+def test_claude_schema_has_no_optional_fields():
+    """Structured outputs reject schemas with many nullable fields ("Schema is too complex")."""
+    import json
+
+    from app.resume import _Extraction
+
+    assert "anyOf" not in json.dumps(_Extraction.model_json_schema())
+
+
+def test_claude_output_is_converted_to_the_profile():
+    from app.resume import _Degree, _Extraction, _Job, _to_profile
+
+    p = _to_profile(_Extraction(
+        name="Arjun Mehta", email="", phone="", location="Bengaluru", headline="Staff Engineer", skills=["Python"],
+        years_experience=-1, links=[" github.com/arjun "], certifications=[""], projects=[],
+        employment_history=[_Job(title="Staff Engineer", company="Razorpay", location="", start="2019", end="present", summary="")],
+        education=[_Degree(degree="", field="", institution="", year=""), _Degree(degree="B.Tech", field="CS", institution="", year="2015")],
+    ))
+    assert p.email is None and p.years_experience is None
+    assert p.links == ["github.com/arjun"] and p.certifications == []
+    assert p.employment_history[0].company == "Razorpay" and p.employment_history[0].location is None
+    assert [e.degree for e in p.education] == ["B.Tech"]

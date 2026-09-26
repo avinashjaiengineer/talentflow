@@ -96,8 +96,69 @@ class CandidateProfile(BaseModel):
     projects: list[str] = Field(default_factory=list, description="Each as 'Name: one-line description'")
 
 
+# What Claude fills in. Structured outputs reject schemas with many optional (nullable) fields
+# ("Schema is too complex"), so every field is required and "" / -1 mean "not stated";
+# _to_profile() turns those back into None.
+class _Job(BaseModel):
+    title: str
+    company: str = Field(description="'' if not stated")
+    location: str = Field(description="'' if not stated")
+    start: str = Field(description="YYYY-MM, or YYYY when only the year is given; '' if not stated")
+    end: str = Field(description="YYYY-MM, YYYY, or 'present' for a current role; '' if not stated")
+    summary: str = Field(description="One sentence on scope and results, from the resume; '' if none")
+
+
+class _Degree(BaseModel):
+    degree: str = Field(description="e.g. 'B.Tech', 'MSc'; '' if not stated")
+    field: str = Field(description="e.g. 'Computer Science'; '' if not stated")
+    institution: str = Field(description="'' if not stated")
+    year: str = Field(description="Graduation or expected year; '' if not stated")
+
+
+class _Extraction(BaseModel):
+    name: str
+    email: str = Field(description="'' if not stated")
+    phone: str = Field(description="'' if not stated")
+    location: str = Field(description="'' if not stated")
+    headline: str = Field(description="One-line professional summary, e.g. 'Senior backend engineer, 8 yrs Python'")
+    skills: list[str] = Field(description="Concrete technical and domain skills")
+    years_experience: float = Field(description="Total professional experience in years; -1 if not stated")
+    links: list[str] = Field(description="LinkedIn, GitHub, portfolio, and other profile URLs")
+    employment_history: list[_Job] = Field(description="Every job, most recent first")
+    education: list[_Degree]
+    certifications: list[str]
+    projects: list[str] = Field(description="Each as 'Name: one-line description'")
+
+
+def _to_profile(x: _Extraction) -> CandidateProfile:
+    def s(v: str) -> str | None:
+        return v.strip() or None
+
+    return CandidateProfile(
+        name=x.name.strip() or "Unknown candidate",
+        email=s(x.email),
+        phone=s(x.phone),
+        location=s(x.location),
+        headline=s(x.headline),
+        skills=x.skills,
+        years_experience=x.years_experience if x.years_experience >= 0 else None,
+        links=[u.strip() for u in x.links if u.strip()],
+        employment_history=[
+            Position(title=j.title.strip() or "Role", company=s(j.company), location=s(j.location),
+                     start=s(j.start), end=s(j.end), summary=s(j.summary))
+            for j in x.employment_history
+        ],
+        education=[
+            Education(degree=s(e.degree), field=s(e.field), institution=s(e.institution), year=s(e.year))
+            for e in x.education if any(v.strip() for v in (e.degree, e.field, e.institution, e.year))
+        ],
+        certifications=[c.strip() for c in x.certifications if c.strip()],
+        projects=[p.strip() for p in x.projects if p.strip()],
+    )
+
+
 SYSTEM = """You extract structured candidate profiles from resumes for a recruiting system.
-Only report facts stated in the resume. Leave a field null, or a list empty, when the resume
+Only report facts stated in the resume. Leave a text field empty (""), or a list empty, when the resume
 does not state it: never guess dates, employers, degrees, or skills.
 Normalize skill names to their common form (e.g. "postgres" -> "PostgreSQL").
 List every job in the work history, most recent first, splitting date ranges into start and end.
@@ -308,13 +369,14 @@ def _heuristic_profile(text: str) -> CandidateProfile:
 
 
 def parse_profile(text: str) -> CandidateProfile:
-    profile = run_structured(
+    result = run_structured(
         agent="screening",
         system=SYSTEM,
         prompt=f"<resume>\n{text}\n</resume>\n\nExtract the candidate profile.",
-        schema=CandidateProfile,
+        schema=_Extraction,
         heuristic=lambda: _heuristic_profile(text),
     )
+    profile = _to_profile(result) if isinstance(result, _Extraction) else result
     profile.skills = _dedupe([s.strip() for s in profile.skills if s.strip()])
     if profile.years_experience is None:
         profile.years_experience = years_from_history(profile.employment_history)
